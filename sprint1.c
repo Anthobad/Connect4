@@ -129,7 +129,7 @@ int main(void) {
         print_board(board);
 
         if (is_winning_move(board, row, col0, current)) {
-            printf("🎉 Player %c wins!\n", current);
+            printf("Player %c wins!\n", current);
             break;
         }
         if (is_draw(board)) {
