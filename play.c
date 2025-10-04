@@ -1,4 +1,3 @@
-// play.c — Sprint 1 console game using gamelogic, with undo/redo + replay menu
 #include "gamelogic.h"
 #include <ctype.h>
 #include <string.h>
@@ -81,8 +80,8 @@ int main(int argc, char** argv) {
         int game_over = 0;
 
         while (!game_over) {
-            printf("Player %c, choose (1-%d), 'u' undo, 'r' redo, or 'q' quit: ",
-                   G.current, COLS);
+            printf("Player %c, choose (1-%d), 'u' undo, 'r' redo, or 'q' quit: ", G.current, COLS);
+	    fflush(stdout);
             if (!fgets(line, sizeof line, stdin)) {
                 puts("\nInput ended. Exiting.");
                 return 0;

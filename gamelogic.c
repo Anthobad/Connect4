@@ -1,13 +1,16 @@
-// gamelogic.c  (rename from game.c if you prefer this name)
 #include "gamelogic.h"
 #include <string.h>
-#include <unistd.h>   // usleep
+#include <unistd.h>
 #include <stdlib.h>
 
-// … the rest of the code you already have …
+
 static int count_dir(const Board* g, int r, int c, int dr, int dc, char p){
     int cnt=0, rr=r, cc=c;
-    while (rr>=0 && rr<ROWS && cc>=0 && cc<COLS && g->cells[rr][cc]==p){ cnt++; rr+=dr; cc+=dc; }
+    while (rr>=0 && rr<ROWS && cc>=0 && cc<COLS && g->cells[rr][cc]==p){ 
+	cnt++; 
+	rr+=dr; 
+	cc+=dc;
+    }
     return cnt;
 }
 
