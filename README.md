@@ -54,6 +54,7 @@ cd connect4
 gcc -Wall -Wextra -o connect4 play.c gamelogic.c ui.c
 ./connect4
 ./connect4 --no-anim
+```
 
 ## Controls
 
