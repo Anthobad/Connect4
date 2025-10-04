@@ -17,8 +17,7 @@ A two-player Connect 4 game implemented in C, featuring:
 - [Compilation](#compilation)  
 - [Running the Game](#running-the-game)  
 - [Controls](#controls)  
-- [Contributing](#contributing)  
-- [License](#license)  
+- [Contributing](#contributing) 
 
 ---
 
@@ -65,7 +64,7 @@ During your turn, you can:
 - `r` → Redo a previously undone move  
 - `q` → Quit the game  
 
-After the game ends, you will be prompted to **play again**.
+After the game ends, you will be prompted to **play again** either input **y** or **n**.
 
 ---
 
