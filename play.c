@@ -153,6 +153,7 @@ static int play_again_prompt(void) {
 	char choice[8];
 	while (1) {
 		printf("\nPlay again? (y/n): ");
+        fflush(stdout);
 		if (!fgets(choice, sizeof(choice), stdin))
 			return 0;
 		if (choice[0] == 'y' || choice[0] == 'Y')
