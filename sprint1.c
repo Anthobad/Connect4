@@ -1,5 +1,5 @@
 // CMPS 241 – Sprint 1: Two-Player Connect 4 (Console)
-// Build: make
+// !!!!DRAFT!!!!
 // Run:   ./connect4
 // Quit anytime by entering 'q' instead of a column number.
 
