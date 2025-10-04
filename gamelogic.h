@@ -11,7 +11,7 @@ typedef struct {
 	char current;
 } Board;
 
-void resetBoard(Board* g);
+void initializeBoard(Board* g);
 int game_in_bounds(int r, int c);
 int game_can_drop(const Board* g, int col);
 int game_drop(Board* g, int col, char player);
