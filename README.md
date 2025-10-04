@@ -50,7 +50,7 @@ Clone the repository:
 ```bash
 git clone https://github.com/your-username/connect4.git
 cd connect4
-gcc -Wall -Wextra -o connect4 play.c gamelogic.c ui.c
+gcc -Wall -Werror -o connect4 play.c gamelogic.c ui.c
 ./connect4
 ./connect4 --no-anim
 ```
