@@ -103,6 +103,7 @@ int main(void) {
     char line[128];
     while (1) {
         printf("Player %c, choose a column (1-%d) or 'q' to quit: ", current, COLS);
+        fflush(stdout);
         if (!fgets(line, sizeof line, stdin)) {
             puts("\nInput ended. Exiting.");
             return 0;
