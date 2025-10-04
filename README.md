@@ -51,3 +51,36 @@ Clone the repository:
 ```bash
 git clone https://github.com/your-username/connect4.git
 cd connect4
+gcc -Wall -Wextra -o connect4 play.c gamelogic.c ui.c
+./connect4
+./connect4 --no-anim
+
+## Controls
+
+During your turn, you can:
+
+- `1-7` → Drop a piece into the chosen column  
+- `u` → Undo the last move  
+- `r` → Redo a previously undone move  
+- `q` → Quit the game  
+
+After the game ends, you will be prompted to **play again**.
+
+---
+
+## Contributing
+
+Contributions are welcome! You can:
+
+- Add new features (e.g., AI opponent)  
+- Improve UI or animations  
+- Fix bugs or optimize the code  
+
+**How to contribute:**
+
+1. Fork the repository.  
+2. Create a new branch: `git checkout -b feature-name`.  
+3. Make your changes.  
+4. Commit your changes: `git commit -m "Add feature"`.  
+5. Push to your branch: `git push origin feature-name`.  
+6. Open a Pull Request on GitHub.
