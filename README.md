@@ -50,6 +50,8 @@ Clone the repository:
 ```bash
 git clone https://github.com/your-username/Connect4.git
 cd Connect4
+```
+
 # Connect Four — Console (C)
 
 This repository contains a small console-based Connect Four implementation in C. It supports a human vs human mode, a simple "easy" bot, undo/redo, and optional drop animations and color output.
@@ -175,7 +177,7 @@ Key helper functions in `play.c` (not necessarily exported):
 - Build must include all .c files. Example:
 
 ```bash
-gcc -std=c11 -Wall -Wextra -o connect4 play.c gamelogic.c ui.c bot.c
+gcc -Wall -Werror -o connect4 play.c gamelogic.c ui.c bot.c
 ```
 
 - If you add new files, include them on the command line or update your Makefile.
