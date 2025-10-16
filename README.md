@@ -1,10 +1,15 @@
 # Connect 4 - Console Game in C
 
+This repository contains a small console-based Connect Four implementation in C. It supports a human vs human mode, a simple "easy" bot, undo/redo, and optional drop animations and color output.
+
+This README documents how to build and run the game, explains public header files and functions, and describes gameplay controls and the bot's behavior.
+
 A two-player Connect 4 game implemented in C, featuring:
 
 - Undo/redo functionality  
 - Animated piece drops  
-- Colored board output in the terminal  
+- Colored board output in the terminal 
+- Play against an easy bot 
 - Cross-platform support (Linux, Windows with `gcc`)  
 
 ---
@@ -15,9 +20,15 @@ A two-player Connect 4 game implemented in C, featuring:
 - [Features](#features)  
 - [Requirements](#requirements)  
 - [Compilation](#compilation)  
-- [Running the Game](#running-the-game)  
+- [Quick start](#quick-start)  
 - [Controls](#controls)  
-- [Contributing](#contributing) 
+- [Files and headers](#files-and-headers) 
+- [Build notes](#build-notes) 
+- [Runtime examples](#runtime-examples) 
+- [Files and headers](#files-and-headers) 
+- [Extending the project](#extending-the-project) 
+- [Credits and license](#credits-and-license) 
+
 
 ---
 
@@ -52,18 +63,17 @@ git clone https://github.com/your-username/Connect4.git
 cd Connect4
 ```
 
-# Connect Four — Console (C)
-
-This repository contains a small console-based Connect Four implementation in C. It supports a human vs human mode, a simple "easy" bot, undo/redo, and optional drop animations and color output.
-
-This README documents how to build and run the game, explains public header files and functions, and describes gameplay controls and the bot's behavior.
-
 ## Quick start
 
 Build (example with gcc):
 
 ```bash
-gcc -std=c11 -Wall -Wextra -o connect4 play.c gamelogic.c ui.c bot.c
+gcc -std=c11 -Wall -Werror -o connect4 play.c gamelogic.c ui.c bot.c
+```
+Or use makefile
+
+```Bash
+make
 ```
 
 Run:
@@ -72,6 +82,8 @@ Run:
 ./connect4        # run with animations and colors (default)
 ./connect4 --no-anim  # disable falling animation
 ```
+
+## Controls
 
 On start the program shows a main menu letting you choose:
 - `1` → Play human vs human (1v1)
@@ -179,7 +191,7 @@ Key helper functions in `play.c` (not necessarily exported):
 ```bash
 gcc -Wall -Werror -o connect4 play.c gamelogic.c ui.c bot.c
 ```
-
+- Or use the provided makefile.
 - If you add new files, include them on the command line or update your Makefile.
 
 ## Runtime examples
@@ -199,7 +211,7 @@ Start and pick mode 2 (1 vs bot):
 ## Extending the project
 
 - To improve the bot, replace `bot.c` with a minimax or heuristic-based move chooser.
-- Add a simple `Makefile` for easier builds.
+- Make the game `multiplayer` through the `network`.
 - Add a save/load feature using `board_to_string` / `string_to_board`.
 
 ## Credits and license
