@@ -1,5 +1,7 @@
 #include "gamelogic.h"
 #include "ui.h"
+#include "bot.h"
+#include <time.h>
 #include <ctype.h>
 #include <string.h>
 #include <stdlib.h>
@@ -169,31 +171,117 @@ int main(int argc, char** argv) {
 	int anim_ms = 110;
 	if (argc > 1 && strcmp(argv[1], "--no-anim") == 0)
 		use_anim = 0;
+	srand((unsigned)time(NULL));
 
 	while (1) {
-		Board G;
-		initializeBoard(&G);
-		reset_history();
-		ui_print_board(&G, 1);
-
-		int game_over = 0;
-		while (!game_over) {
-			int r = handle_turn(&G, use_anim, anim_ms);
-			if (r == -2) {
-				puts("Goodbye!");
-				return 0;
-			}
-			if (r == -1) {
-				puts("\nInput ended. Exiting.");
-				return 0;
-			}
-			if (r == 1)
-				game_over = 1;
-		}
-
-		if (!play_again_prompt()) {
-			puts("Thanks for playing!");
+		ui_clear_screen();
+		puts("Connect Four\n");
+		puts("1) Play 1v1 (human vs human)");
+		puts("2) Play 1 vs Easy Bot (human vs computer)");
+		puts("q) Quit");
+		printf("Select an option: ");
+		fflush(stdout);
+		char choice[8];
+		if (!fgets(choice, sizeof(choice), stdin)) {
+			puts("\nInput ended. Exiting.");
 			return 0;
+		}
+		if (choice[0] == 'q' || choice[0] == 'Q') {
+			puts("Goodbye!");
+			return 0;
+		}
+		if (choice[0] == '1') {
+			Board G;
+			initializeBoard(&G);
+			reset_history();
+			ui_print_board(&G, 1);
+
+			int game_over = 0;
+			while (!game_over) {
+				int r = handle_turn(&G, use_anim, anim_ms);
+				if (r == -2) {
+					puts("Goodbye!");
+					return 0;
+				}
+				if (r == -1) {
+					puts("\nInput ended. Exiting.");
+					return 0;
+				}
+				if (r == 1)
+					game_over = 1;
+			}
+
+			if (!play_again_prompt()) {
+				puts("Thanks for playing!");
+				return 0;
+			}
+		} 
+		else if (choice[0] == '2') {
+			int play_more = 1;
+			while (play_more) {
+				Board G;
+				initializeBoard(&G);
+				reset_history();
+				ui_print_board(&G, 1);
+
+				int game_over = 0;
+				while (!game_over) {
+					if (G.current == 'A') {
+						int r = handle_turn(&G, use_anim, anim_ms);
+						if (r == -2) {
+							puts("Goodbye!");
+							return 0;
+						}
+						if (r == -1) {
+							puts("\nInput ended. Exiting.");
+							return 0;
+						}
+						if (r == 1) {
+							game_over = 1;
+							break;
+						}
+					} 
+					else {
+						int col0 = bot_choose_move(&G);
+						if (col0 == -1) {
+							if (checkDraw(&G)) {
+								puts("It's a draw! Board is full.");
+								game_over = 1;
+								break;
+							}
+						} 
+						else {
+							int row = do_drop(&G, col0, use_anim, anim_ms);
+							if (row != -1) {
+								record_move(row, col0, G.current);
+								if (!use_anim)
+									ui_print_board(&G, 1);
+								if (checkWin(&G, row, col0, G.current)) {
+									printf("Player %c (bot) wins!\n", G.current);
+									game_over = 1;
+									break;
+								}
+								if (checkDraw(&G)) {
+									puts("It's a draw! Board is full.");
+									game_over = 1;
+									break;
+								}
+								switch_player(&G);
+							}
+						}
+					}
+				}
+
+				play_more = !play_again_prompt();
+				if (play_more) {
+					puts("Thanks for playing!");
+					return 0;
+				}
+			}
+		} 
+		else {
+			puts("Invalid selection. Press Enter to continue.");
+			fgets(choice, sizeof(choice), stdin);
 		}
 	}
 }
