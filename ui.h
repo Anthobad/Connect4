@@ -1,3 +1,6 @@
+#ifndef UI_H
+#define UI_H
+
 #pragma once
 #include "gamelogic.h"
 
@@ -9,3 +12,5 @@ typedef struct {
 void ui_clear_screen(void);
 void ui_print_board(const Board* g, int use_color);
 int ui_drop_with_animation(Board* g, int col, char player, const UiOptions* opt);
+
+#endif // UI_H

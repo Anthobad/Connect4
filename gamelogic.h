@@ -1,3 +1,6 @@
+#ifndef GAMELOGIC_H
+#define GAMELOGIC_H
+
 #pragma once
 
 #include <stdio.h>
@@ -19,3 +22,5 @@ int checkWin(const Board* g, int r, int c, char player);
 int checkDraw(const Board* g);
 void board_to_string(const Board* g, char out[ROWS*COLS + 1]);
 void string_to_board(Board* g, const char* s);
+
+#endif // GAMELOGIC_H
