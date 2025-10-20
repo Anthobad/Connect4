@@ -37,22 +37,29 @@ static void record_move(int row, int col, char player) {
 	}
 }
 
-static int undo_move(Board* G) {
+static int undo_move(Board* G, int s) {
 	if (current_index == 0)
 		return 0;
-	current_index--;
-	Move m = history[current_index];
-	G->cells[m.row][m.col] = EMPTY;
-	G->current = m.player;
+	for(int i = 0; i < s; i++) {
+		if (current_index == 0)
+			return 0;
+		current_index--;
+		Move m = history[current_index];
+		G->cells[m.row][m.col] = EMPTY;
+		G->current = m.player;
+	}
 	return 1;
 }
 
-static int redo_move(Board* G) {
-	if (current_index == move_count)
-		return 0;
-	Move m = history[current_index];
-	G->cells[m.row][m.col] = m.player;
-	current_index++;
+static int redo_move(Board* G, int s) {
+	Move m;
+	for(int i = 0; i < s; i++) {
+		if (current_index == move_count)
+			return 0;
+		m = history[current_index];
+		G->cells[m.row][m.col] = m.player;
+		current_index++;
+	}
 	if (m.player == 'A')
 		G->current = 'B';
 	else
@@ -103,7 +110,7 @@ static int do_drop(Board* G, int col0, int use_anim, int anim_ms) {
 	}
 }
 
-static int handle_turn(Board* G, int use_anim, int anim_ms) {
+static int handle_turn(Board* G, int choice, int use_anim, int anim_ms) {
 	char line[128];
 	printf("Player %c, choose (1-%d), 'u' undo, 'r' redo, or 'q' quit: ", G->current, COLS);
     fflush(stdout);
@@ -114,14 +121,14 @@ static int handle_turn(Board* G, int use_anim, int anim_ms) {
 	if (a == -1)
 		return -2;
 	if (a == -2) {
-		if (undo_move(G))
+		if (undo_move(G, choice))
 			ui_print_board(G, 1);
 		else
 			puts("Nothing to undo.");
 		return 0;
 	}
 	if (a == -3) {
-		if (redo_move(G))
+		if (redo_move(G, choice))
 			ui_print_board(G, 1);
 		else
 			puts("Nothing to redo.");
@@ -198,7 +205,7 @@ int main(int argc, char** argv) {
 
 			int game_over = 0;
 			while (!game_over) {
-				int r = handle_turn(&G, use_anim, anim_ms);
+				int r = handle_turn(&G, choice[0] - '0', use_anim, anim_ms);
 				if (r == -2) {
 					puts("Goodbye!");
 					return 0;
@@ -227,7 +234,7 @@ int main(int argc, char** argv) {
 				int game_over = 0;
 				while (!game_over) {
 					if (G.current == 'A') {
-						int r = handle_turn(&G, use_anim, anim_ms);
+						int r = handle_turn(&G, choice[0] - '0', use_anim, anim_ms);
 						if (r == -2) {
 							puts("Goodbye!");
 							return 0;
