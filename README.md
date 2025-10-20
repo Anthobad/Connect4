@@ -181,7 +181,7 @@ Note: The bot is intentionally simple (random). You can replace the implementati
 Key helper functions in `play.c` (not necessarily exported):
 - `record_move(row,col,player)` — push a move into an internal history buffer for undo/redo.
 - `undo_move(Board* G)` / `redo_move(Board* G)` — perform undo/redo using the history buffer and update `G->current`.
-- `handle_turn(Board* G, int use_anim, int anim_ms)` — prompt the current human player for input and perform their action (drop/undo/redo/quit). Returns codes to indicate game-over or quit.
+- `handle_turn(Board* G, int choice, int use_anim, int anim_ms)` — prompt the current human player for input and perform their action (drop/undo/redo/quit). The `choice` parameter is the top-level menu choice (`'1'` for 1v1, `'2'` for 1vBot) so undo/redo can act on single or paired moves. Returns codes to indicate game-over or quit.
 - `do_drop(Board* G, int col0, int use_anim, int anim_ms)` — helper that calls `ui_drop_with_animation` or `game_drop` depending on `use_anim`.
 
 ## Build notes
