@@ -8,6 +8,12 @@ OBJS := play.o gamelogic.o ui.o bot.o
 
 all: connect4
 
+run: connect4
+	./connect4
+
+run-no-anim: connect4
+	./connect4 --no-anim
+
 connect4: $(OBJS)
 	$(CC) -o $@ $^
 
