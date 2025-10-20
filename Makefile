@@ -28,7 +28,7 @@ clean:
 
 help:
 	@echo "Makefile targets:"
-	@echo "  make        (build $(TARGET))"
-	@echo "  make run    (build and run with animation)"
-	@echo "  make run-no-anim (build and run without animation)"
-	@echo "  make clean  (remove object files and binary)"
+	@echo "  make                (build connect4)"
+	@echo "  make run            (build and run with animation)"
+	@echo "  make run-no-anim    (build and run without animation)"
+	@echo "  make clean          (remove object files and binary)"
