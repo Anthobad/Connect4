@@ -1,4 +1,4 @@
-#define _XOPEN_SOURCE 500
+#define _XOPEN_SOURCE 500 // this enables usleep in c11 because it hides it
 #include "ui.h"
 #include <stdio.h>
 #include <unistd.h>
