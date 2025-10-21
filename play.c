@@ -52,7 +52,7 @@ static int undo_move(Board* G, int s) {
 }
 
 static int redo_move(Board* G, int s) {
-	Move m;
+	Move m = history[current_index];
 	for(int i = 0; i < s; i++) {
 		if (current_index == move_count)
 			return 0;
