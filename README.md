@@ -43,7 +43,7 @@ If the board fills up without a winner, the game ends in a draw.
 
   * Easy → random valid move
   * Medium → **2-step lookahead**: Blocks win conditions, if no win condition, use same logic as Easy bot but make sures that it doesn't do a random play that gives a win condition
-* **Reworked Main Mene**
+* **Reworked Main Menu**
 
   * Play Directly (Human vs Human)
   * Play vs Bot (Easy / Medium)
