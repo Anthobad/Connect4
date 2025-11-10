@@ -32,9 +32,37 @@ bot.o: bot.c bot.h gamelogic.h
 clean:
 	rm -f $(OBJS) connect4
 
+test:
+	@echo "=========================================="
+	@echo "Testing Connect4 with optimization levels"
+	@echo "=========================================="
+	@for opt in 0 1 2 3; do \
+		make clean >/dev/null; \
+		echo ""; \
+		echo " > Compiling with -O$$opt"; \
+		echo "------------------------------------------"; \
+		$(CC) $(CFLAGS) -O$$opt -o connect4_O$$opt $(SRCS); \
+		if [ $$? -ne 0 ]; then \
+			echo "Compilation failed for -O$$opt"; \
+			exit 1; \
+		fi; \
+		echo "Compilation succeeded for -O$$opt"; \
+		rm connect4_O$$opt; \
+	done
+	@echo ""
+valgrind:
+	@echo "=========================================="
+	@echo "Running Valgrind Memory Check (-O3 build)"
+	@echo "=========================================="
+	@$(CC) $(CFLAGS) -O3 -o connect4 $(SRCS)
+	@valgrind --leak-check=full --error-exitcode=1 ./connect4 || echo "Memory leaks detected!"
+	@make clean >/dev/null
+
 help:
 	@echo "Makefile targets:"
 	@echo "  make                (build connect4)"
 	@echo "  make run            (build and run with animation)"
 	@echo "  make run-no-anim    (build and run without animation)"
 	@echo "  make clean          (remove object files and binary)"
+	@echo "  make test           (compile with various optimization levels)"
+	@echo "  make valgrind       (run Valgrind memory check on -O3 build)"
