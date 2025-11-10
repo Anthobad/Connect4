@@ -122,7 +122,8 @@ typedef struct {
 	char current; // 'A' or 'B'
 } Board;
 
-void initializeBoard(Board* g);
+void initializeBoard(Board* g, char turn);
+void setCurrent(Board* g, char turn);
 int game_in_bounds(int r, int c);
 int game_can_drop(const Board* g, int col);
 int game_drop(Board* g, int col, char player);
@@ -133,7 +134,8 @@ void string_to_board(Board* g, const char* s);
 ```
 
 Function notes:
-- `initializeBoard(Board* g)` — Fill the board with `EMPTY` and set `current = 'A'`.
+- `initializeBoard(Board* g, char turn)` — Fill the board with `EMPTY` and set `current = turn` by calling the `setCurrent` function.
+- `void setCurrent(Board* g, char turn)` — Sets the current player of the board to A or B.
 - `game_in_bounds(r,c)` — Return non-zero if (r,c) is within the grid.
 - `game_can_drop(const Board* g, int col)` — Return the row index (0-based) of where a piece would land if dropped into `col`, or `-1` if the column is full or out of range.
 - `game_drop(Board* g, int col, char player)` — If possible, place `player` (`'A'`/`'B'`) into the correct row for `col` and return the row; otherwise return `-1`.
