@@ -200,11 +200,17 @@ int main(int argc, char** argv) {
 		if (choice[0] == '1') {
 			char turn[8];
 			printf("Which player goes first, A or B:");
-			fgets(turn, sizeof(turn), stdin);
+			if(!fgets(turn, sizeof(turn), stdin)){
+				puts("\nInput ended. Exiting.");
+				return 0;
+			}
 			while(turn[0] != 'A' && turn[0] != 'B'){
 				puts("Invalid letter label, try again.");
 				printf("Which player goes first, A or B:");
-				fgets(turn, sizeof(turn), stdin);
+				if(!fgets(turn, sizeof(turn), stdin)){
+					puts("\nInput ended. Exiting.");
+					return 0;
+				}
 			}
 			Board G;
 			initializeBoard(&G, turn[0]);
@@ -234,11 +240,17 @@ int main(int argc, char** argv) {
 		else if (choice[0] == '2') {
 			char turn[8];
 			printf("Which player goes first, You(A) or the Bot(B):");
-			fgets(turn, sizeof(turn), stdin);
+			if(!fgets(turn, sizeof(turn), stdin)){
+				puts("\nInput ended. Exiting.");
+				return 0;
+			}
 			while(turn[0] != 'A' && turn[0] != 'B'){
 				puts("Invalid letter label, try again.");
 				printf("Which player goes first, You(A) or the Bot(B):");
-				fgets(turn, sizeof(turn), stdin);
+				if(!fgets(turn, sizeof(turn), stdin)){
+					puts("\nInput ended. Exiting.");
+					return 0;
+				}
 			}
 			int play_more = 1;
 			while (play_more) {
@@ -304,7 +316,10 @@ int main(int argc, char** argv) {
 		} 
 		else {
 			puts("Invalid selection. Press Enter to continue.");
-			fgets(choice, sizeof(choice), stdin);
+			if(!fgets(choice, sizeof(choice), stdin)){
+				puts("\nInput ended. Exiting.");
+				return 0;
+			}
 		}
 	}
 }
