@@ -12,5 +12,9 @@ typedef struct {
 void ui_clear_screen(void);
 void ui_print_board(const Board* g, int use_color);
 int ui_drop_with_animation(Board* g, int col, char player, const UiOptions* opt);
+int ui_main_menu(void);
+int ui_bot_menu(void);
+void ui_show_about(void);
+void ui_wait_for_enter(void);
 
-#endif // UI_H
+#endif

@@ -70,3 +70,85 @@ int ui_drop_with_animation(Board* g, int col, char player, const UiOptions* opt)
 	ui_print_board(g, use_color_final);
 	return landing;
 }
+
+void ui_wait_for_enter(void) {
+	char buf[16];
+	printf("\nPress Enter to continue...");
+	fflush(stdout);
+	fgets(buf, sizeof buf, stdin);
+}
+
+int ui_main_menu(void) {
+	while (1) {
+		ui_clear_screen();
+		puts("Connect Four\n");
+		puts("1) Play directly (human vs human)");
+		puts("2) Play online with friends");
+		puts("3) Play vs Bot");
+		puts("4) About game");
+		puts("q) Quit");
+		printf("Select an option: ");
+		fflush(stdout);
+
+		char line[16];
+		if (!fgets(line, sizeof line, stdin)) {
+			return 0;
+		}
+
+		char ch = line[0];
+		if (ch == 'q' || ch == 'Q') return 0;
+		if (ch == '1') return 1;
+		if (ch == '2') return 2;
+		if (ch == '3') return 3;
+		if (ch == '4') return 4;
+
+		puts("Invalid selection.");
+		ui_wait_for_enter();
+	}
+}
+
+int ui_bot_menu(void) {
+	while (1) {
+		ui_clear_screen();
+		puts("Play vs Bot\n");
+		puts("1) Easy");
+		puts("2) Medium");
+		puts("3) Hard");
+		puts("b) Back to main menu");
+		printf("Select difficulty: ");
+		fflush(stdout);
+
+		char line[16];
+		if (!fgets(line, sizeof line, stdin)) {
+			return 0;
+		}
+
+		char ch = line[0];
+		if (ch == 'b' || ch == 'B') return 0;
+		if (ch == '1') return 1;
+		if (ch == '2') return 2;
+		if (ch == '3') return 3;
+
+		puts("Invalid selection.");
+		ui_wait_for_enter();
+	}
+}
+
+void ui_show_about(void) {
+	ui_clear_screen();
+	puts("About Connect Four\n");
+	puts("This is a console-based Connect Four game built as a CMPS 241 project.");
+	puts("- Board size: 7 columns x 6 rows");
+	puts("- Players: A and B");
+	puts("- Win by connecting 4 in a row horizontally, vertically, or diagonally.");
+	puts("");
+	puts("Current features:");
+	puts("- Human vs human mode");
+	puts("- Easy and Medium bots");
+	puts("- Undo/redo");
+	puts("- Optional drop animation and colored output");
+	puts("");
+	puts("Future work:");
+	puts("- Online multiplayer (Play online with friends)");
+	puts("- Hard-level bot (stronger AI).");
+}

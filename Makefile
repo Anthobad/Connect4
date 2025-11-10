@@ -3,8 +3,8 @@
 CC := gcc
 CFLAGS := -std=c11 -Wall -Werror -g
 
-SRCS := play.c gamelogic.c ui.c bot.c
-OBJS := play.o gamelogic.o ui.o bot.o
+SRCS := play.c gamelogic.c ui.c bot.c history.c input.c controller.c
+OBJS := play.o gamelogic.o ui.o bot.o history.o input.o controller.o
 
 all: connect4
 
