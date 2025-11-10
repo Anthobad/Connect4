@@ -14,13 +14,17 @@ static int count_connected_checkers(const Board* g, int r, int c, int rowDir, in
 	return streak;
 }
 
-void initializeBoard(Board* g) {
+void initializeBoard(Board* g, char turn) {
 	for (int r = 0; r < ROWS; r++) {
 		for (int c = 0; c < COLS; c++) {
 			g->cells[r][c] = EMPTY;
 		}
 	}
-	g->current = 'A';
+	setCurrent(g, turn);
+}
+
+void setCurrent(Board* g, char turn){
+	g->current = turn;
 }
 
 int game_in_bounds(int r, int c) {

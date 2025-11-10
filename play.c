@@ -198,8 +198,16 @@ int main(int argc, char** argv) {
 			return 0;
 		}
 		if (choice[0] == '1') {
+			char turn[8];
+			printf("Which player goes first, A or B:");
+			fgets(turn, sizeof(turn), stdin);
+			while(turn[0] != 'A' && turn[0] != 'B'){
+				puts("Invalid letter label, try again.");
+				printf("Which player goes first, A or B:");
+				fgets(turn, sizeof(turn), stdin);
+			}
 			Board G;
-			initializeBoard(&G);
+			initializeBoard(&G, turn[0]);
 			reset_history();
 			ui_print_board(&G, 1);
 
@@ -224,10 +232,18 @@ int main(int argc, char** argv) {
 			}
 		} 
 		else if (choice[0] == '2') {
+			char turn[8];
+			printf("Which player goes first, You(A) or the Bot(B):");
+			fgets(turn, sizeof(turn), stdin);
+			while(turn[0] != 'A' && turn[0] != 'B'){
+				puts("Invalid letter label, try again.");
+				printf("Which player goes first, You(A) or the Bot(B):");
+				fgets(turn, sizeof(turn), stdin);
+			}
 			int play_more = 1;
 			while (play_more) {
 				Board G;
-				initializeBoard(&G);
+				initializeBoard(&G, turn[0]);
 				reset_history();
 				ui_print_board(&G, 1);
 
