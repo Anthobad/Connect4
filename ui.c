@@ -75,7 +75,7 @@ void ui_wait_for_enter(void) {
 	char buf[16];
 	printf("\nPress Enter to continue...");
 	fflush(stdout);
-	fgets(buf, sizeof buf, stdin);
+	if(!fgets(buf, sizeof buf, stdin)){}
 }
 
 int ui_main_menu(void) {
