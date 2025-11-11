@@ -6,7 +6,7 @@
 static void ui_print_header_row(void) {
 	printf("   ");
 	for (int c = 0; c < COLS; c++)
-		printf("%d ", c + 1);
+		printf(" %d", c + 1);
 	puts("\n  +---------------+");
 }
 
