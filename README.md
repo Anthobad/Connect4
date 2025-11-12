@@ -139,21 +139,29 @@ Top-level source files:
 ## Module overview
 
 ### gamelogic.h
-
 ```c
 #define ROWS 6
 #define COLS 7
 #define EMPTY '.'
 
+/* Bitboard representation used by the current implementation.
+ * Each column uses 7 bits (one unused/top sentinel), so the board fits in
+ * 7 * 7 = 49 bits within a 64-bit integer. Bit index = r + c*7 where
+ * r is row (0 = top, ROWS-1 = bottom), and c is column (0..6).
+ */
 typedef struct {
-	char cells[ROWS][COLS];
-	char current;
+  uint64_t playerA; /* bits set where player A has pieces */
+  uint64_t playerB; /* bits set where player B has pieces */
+  uint64_t mask;    /* bits set where any piece exists */
+  char current;     /* 'A' or 'B' — who's turn it is */
 } Board;
 
+void setChar(Board* g, int r, int c, char player);
+char getChar(const Board* g, int r, int c);
 void initializeBoard(Board* g, char turn);
-int game_can_drop(const Board* g, int col);
-int game_drop(Board* g, int col, char player);
-int checkWin(const Board* g, int r, int c, char player);
+int game_can_drop(const Board* g, int col); /* returns landing row or -1 */
+int game_drop(Board* g, int col, char player); /* returns landing row or -1 */
+int checkWin(const Board* g, char player);
 int checkDraw(const Board* g);
 ```
 
@@ -164,7 +172,8 @@ int checkDraw(const Board* g);
 ```c
 void ui_clear_screen(void);
 void ui_print_board(const Board* g, int use_color);
-int ui_drop_with_animation(Board* g, int col, char player, int delay_ms);
+/* ui_drop_with_animation now takes an options struct pointer for colors/delay */
+int ui_drop_with_animation(Board* g, int col, char player, const UiOptions* opt);
 int ui_main_menu(void);
 int ui_bot_menu(void);
 ```
@@ -198,8 +207,11 @@ and avoids playing into an immediate loss.
 ```c
 void history_reset(void);
 void history_record_move(int row, int col, char player);
-int history_undo(Board* G);
-int history_redo(Board* G);
+/* undo/redo accept a steps parameter so modes (like bot vs human) can
+ * undo/redo multiple moves at once (e.g. undo both player and bot move).
+ */
+int history_undo(Board* G, int steps);
+int history_redo(Board* G, int steps);
 ```
 
 Implements an **undo/redo system** that tracks every move.
