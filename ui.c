@@ -20,7 +20,7 @@ void ui_print_board(const Board* g, int use_color) {
 	for (int r = 0; r < ROWS; r++) {
 		printf("%d | ", ROWS - r);
 		for (int c = 0; c < COLS; c++) {
-			char ch = g->cells[r][c];
+			char ch = getChar(g, r, c);
 			if (use_color == 0) {
 				printf("%c ", ch);
 			} else {
@@ -44,9 +44,9 @@ int ui_drop_with_animation(Board* g, int col, char player, const UiOptions* opt)
 	Board temp = *g;
 	for (int r = 0; r <= landing; r++) {
 		temp = *g;
-		if (temp.cells[r][col] != EMPTY)
+		if (getChar(&temp, r, col) != EMPTY)
 			continue;
-		temp.cells[r][col] = player;
+		setChar(&temp, r, col, player);
 		ui_clear_screen();
 		int use_color = 0;
 		if (opt)
@@ -62,7 +62,7 @@ int ui_drop_with_animation(Board* g, int col, char player, const UiOptions* opt)
 			ms = 0;
 		usleep((unsigned)(ms) * 1000);
 	}
-	g->cells[landing][col] = player;
+	setChar(g, landing, col, player);
 	ui_clear_screen();
 	int use_color_final = 0;
 	if (opt)

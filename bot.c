@@ -5,7 +5,7 @@ int bot_choose_move(const Board* g) {
 	int valid[COLS];
 	int n = 0;
 	for (int c = 0; c < COLS; c++) {
-		if (g->cells[0][c] == EMPTY) {
+		if (getChar(g, 0, c) == EMPTY) {
 			valid[n++] = c;
 		}
 	}
@@ -26,8 +26,8 @@ int bot_choose_move_medium(const Board* g) { //Time complexity of this algorith 
 			continue;
 		}
 		Board temp = *g;
-		temp.cells[r][c] = human;
-		if (checkWin(&temp, r, c, human)) {
+		setChar(&temp, r, c, human);
+		if (checkWin(&temp, human)) {
 			blocking_cols[num_blocking++] = c;
 		}
 	}

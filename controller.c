@@ -75,7 +75,7 @@ static int handle_turn(Board* G, int undo_span, int use_anim, int anim_ms) {
 	if (!use_anim)
 		ui_print_board(G, 1);
 
-	if (checkWin(G, row, col0, G->current)) {
+	if (checkWin(G, G->current)) {
 		printf("Player %c wins!\n", G->current);
 		return 1;
 	}
@@ -211,7 +211,7 @@ void run_vs_bot(int use_anim, int anim_ms, int difficulty) {
 						if (!use_anim)
 							ui_print_board(&G, 1);
 
-						if (checkWin(&G, row, col0, G.current)) {
+						if (checkWin(&G, G.current)) {
 							printf("Player %c (bot) wins!\n", G.current);
 							game_over = 1;
 							break;
