@@ -82,9 +82,11 @@ int game_drop(Board* g, int col, char player) {
 	/* Do not switch g->current here. Controller manages turn switching. */
 	return landing;
 }
+
 // ...-0000000-0000000-0100001
 // ...-0000000-0100001-0000000
 // ...-0100001-0000000-0000000
+
 int checkWin(const Board* g, char player) {
 	uint64_t bb;
 	if(player == 'A')
@@ -113,7 +115,11 @@ int checkWin(const Board* g, char player) {
 }
 
 int checkDraw(const Board* g) {
-	return g->mask == ((1ULL << 49) - 1ULL);
+    for (int c = 0; c < COLS; c++) {
+        if (game_can_drop(g, c) != -1)
+            return 0;
+    }
+    return 1;
 }
 
 // void board_to_string(const Board* g, char out[ROWS*COLS + 1]) {

@@ -17,37 +17,37 @@ static inline uint64_t column_mask(int col) {
 }
 
 static inline int can_play(const Board* b, int col) {
-	return (b->mask & (1ULL << (col * 7 + 5))) == 0;
+    return game_can_drop(b, col) != -1;
 }
 
 static inline uint64_t make_move_bit(const Board* b, int col) {
-	uint64_t bottom = (1ULL << (col * 7));
-	uint64_t colmask = column_mask(col);
-	return (b->mask + bottom) & colmask;
+    // Use the same logic as game_drop/game_can_drop
+    int landing = game_can_drop(b, col);
+    if (landing == -1) return 0ULL;         // column full (shouldn't happen if can_play() was checked)
+    return 1ULL << (landing + col * 7);
 }
 
-static inline void apply_move(Board* b, int col) {
-	uint64_t mv = make_move_bit(b, col);
-	if (b->current == 'A') b->playerA ^= mv;
-	else b->playerB ^= mv;
-	b->mask |= mv;
+static inline void apply_move(Board* b, int col, char side) {
+    uint64_t mv = make_move_bit(b, col);
+    if (side == 'A') b->playerA ^= mv;
+    else             b->playerB ^= mv;
+    b->mask |= mv;
 }
 
 static inline void undo_move(Board* b, int col) {
-	uint64_t colm = column_mask(col) & b->mask;
-	for(int r = ROWS; r >= 0; r--) {
-		int bit = col * 7 + r;
-		uint64_t m = (1ULL << bit);
-		if (b->mask & m) {
-			b->mask ^= m;
-			if (b->playerA & m)
-				b->playerA ^= m;
-			else if (b->playerB & m)
-				b->playerB ^= m;
-			b->current = (b->current == 'A') ? 'B' : 'A';
-			return;
-		}
-	}
+    for (int r = ROWS; r >= 0; r--) {
+        int bit = col * 7 + r;
+        uint64_t m = (1ULL << bit);
+        if (b->mask & m) {
+            b->mask ^= m;
+            if (b->playerA & m)
+                b->playerA ^= m;
+            else if (b->playerB & m)
+                b->playerB ^= m;
+            // DO NOT change b->current here
+            return;
+        }
+    }
 }
 
 //static inline int bitboard_win(uint64_t bb) {
@@ -80,17 +80,17 @@ typedef struct {
 
 static TTEntry* tt = NULL;
 
-static void zobrist_init() {
+void zobrist_init() {
 	srand((unsigned)time(NULL));
 	for(int p = 0; p < 2; p++) {
 		for(int i = 0; i < 42; i++) {
 			zobrist[p][i] = rand()*UINT64_MAX;
-			zobrist_side=rand()*UINT64_MAX;
 		}
 	}
+    zobrist_side = ((uint64_t)rand() << 33) ^ ((uint64_t)rand() << 17) ^ rand();
 }
 
-static void tt_init() {
+void tt_init() {
 	tt = calloc(TT_SIZE,sizeof(TTEntry)); // Try to load persistent TT
 	FILE* f = fopen("tt.bin","rb");
 	if(f) {
@@ -197,9 +197,9 @@ static int negamax_solve(Board* b, int alpha, int beta, char side, int ply) {
 	int alpha_orig = alpha;
 	for(int i = 0; i < n; i++) {
 		int col = moves[i];
-		apply_move(b,col);
-		int val = -negamax_solve(b, -beta, -alpha, (side == 'A') ? 'B' : 'A', ply+1);
-		undo_move(b,col);
+		apply_move(b, col, side);
+        int val = -negamax_solve(b, -beta, -alpha, (side == 'A') ? 'B' : 'A', ply+1);
+		undo_move(b, col);
 		if(val > best) {
 			best = val;
 			best_move = col;
@@ -207,7 +207,11 @@ static int negamax_solve(Board* b, int alpha, int beta, char side, int ply) {
 		if(best > alpha) alpha = best;
 		if(alpha >= beta) break;
 	}
-	if(tt) tt_store(key, best, 64, EXACT, best_move);
+    TTFlag flag;
+    if(best <= alpha_orig) flag = UPPERBOUND;
+    else if(best >= beta) flag = LOWERBOUND;
+    else flag = EXACT;
+	if(tt) tt_store(key, best, 64, flag, best_move);
 	return best;
 }
 
@@ -234,30 +238,50 @@ int opening_book_move(Board* b, int ply) {
 
 // --- Wrapper: automatic best move ---
 int pick_best_move(Board* b) {
-	int ply = __builtin_popcountll(b->mask);
-	int move = opening_book_move(b, ply);
-	if(move != -1) return move;
-	int best = -1;
-	int alpha = -MATE;
-	int beta  = MATE;
-	int best_val = -MATE;
-	int moves[COLS];
-	int n = 0;
-	for(int i = 0; i < COLS; i++) if(can_play(b,i)) moves[n++] = i;
-	for(int i = 0; i < n; i++) {
-		int col = moves[i];
-		apply_move(b,col);
-		int val = -negamax_solve(b, -beta, -alpha, (b->current == 'A' ) ? 'B' : 'A', ply+1);
-		undo_move(b,col);
-		if(val > best_val) {
-			best_val = val;
-			best = col;
-		}
-		if(best_val > alpha) alpha = best_val;
-	}
+    int ply = __builtin_popcountll(b->mask);
 
-	return best;
+    printf("[DEBUG] ply=%d, current=%c, legal moves:", ply, b->current);
+    for (int i = 0; i < COLS; ++i)
+        if (can_play(b, i)) printf(" %d", i+1);
+    puts("");
 
+    // Opening book: only if the move is actually playable
+    int book = opening_book_move(b, ply);
+    if (book != -1 && can_play(b, book)) {
+        return book;
+    }
+
+    int best = -1;
+    int alpha = -MATE;
+    int beta  =  MATE;
+    int best_val = -MATE;
+
+    int moves[COLS];
+    int n = 0;
+    for (int i = 0; i < COLS; i++)
+        if (can_play(b, i)) moves[n++] = i;
+
+    if (n == 0) {
+        // No legal moves: it's a draw from search POV
+        return -1;
+    }
+
+    char side = b->current;   // side to move at root
+
+    for (int i = 0; i < n; i++) {
+        int col = moves[i];
+        apply_move(b, col, side);
+        int val = -negamax_solve(b, -beta, -alpha, (side == 'A') ? 'B' : 'A', ply + 1);
+        undo_move(b, col);
+
+        if (val > best_val) {
+            best_val = val;
+            best = col;
+        }
+        if (best_val > alpha) alpha = best_val;
+    }
+
+    return best;
 }
 
 // --- Call before exit to save TT ---
