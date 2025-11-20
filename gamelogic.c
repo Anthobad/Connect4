@@ -52,7 +52,9 @@ void initializeBoard(Board* g, char turn) {
 // 		return 1;
 // 	return 0;
 // }
-
+// the bitboard takes the LSB of the to be 5,0 spot in the 2d array, and left bit is the one below and so on umtil the highest row.
+// then the 7th bit from the end (LSB) is the ROW5 , COL1.
+// there is an extra bit in every col for spacing. instead of 6 bits there is 7 bits.
 int game_can_drop(const Board* g, int col) {
 	if (col < 0 || col >= COLS)
 		return -1;
@@ -80,7 +82,9 @@ int game_drop(Board* g, int col, char player) {
 	/* Do not switch g->current here. Controller manages turn switching. */
 	return landing;
 }
-
+// ...-0000000-0000000-0100001
+// ...-0000000-0100001-0000000
+// ...-0100001-0000000-0000000
 int checkWin(const Board* g, char player) {
 	uint64_t bb;
 	if(player == 'A')
@@ -88,19 +92,19 @@ int checkWin(const Board* g, char player) {
 	else
 		bb = g->playerB;
 	uint64_t m;
-	//vertical check
+	//horizontal check acc to bitboard
 	m = bb & (bb >> 7);
 	if(m & (m >> 14))
 		return 1;
-	//\ check
+	// / check acc to bitboard
 	m = bb & (bb >> 6);
 	if(m & (m >> 12))
 		return 1;
-	/// check
+	// \ check acc to bitboard
 	m = bb & (bb >> 8);
 	if(m & (m >> 16))
 		return 1;
-	//horizontal check
+	//vertical check acc to bitboard
 	m = bb & (bb >> 1);
 	if(m & (m >> 2))
 		return 1;

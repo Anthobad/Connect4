@@ -34,12 +34,8 @@ int main(int argc, char** argv) {
 			int diff = ui_bot_menu();
 			if (diff == 0) {
 				continue;
-			} else if (diff == 1 || diff == 2) {
+			} else if (diff == 1 || diff == 2 || diff == 3) {
 				run_vs_bot(use_anim, anim_ms, diff);
-			} else if (diff == 3) {
-				ui_clear_screen();
-				puts("Hard bot is not implemented yet.");
-				ui_wait_for_enter();
 			}
 		} else if (selection == 4) {
 			ui_show_about();

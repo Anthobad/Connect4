@@ -174,7 +174,8 @@ void run_vs_bot(int use_anim, int anim_ms, int difficulty) {
 		initializeBoard(&G, turn[0]);
 		history_reset();
 		ui_print_board(&G, 1);
-
+		char bot_side = (turn[0] == 'A') ? 'B' : 'A';
+		super_bot_init(bot_side);
 		int game_over = 0;
 		while (!game_over) {
 			if (G.current == 'A') {
@@ -195,8 +196,10 @@ void run_vs_bot(int use_anim, int anim_ms, int difficulty) {
 				int col0;
 				if (difficulty == 1)
 					col0 = bot_choose_move(&G);
-				else
+				else if (difficulty ==2)
 					col0 = bot_choose_move_medium(&G);
+				else
+					col0 = pick_best_move(&G, bot_side);
 
 				if (col0 == -1) {
 					if (checkDraw(&G)) {
@@ -226,7 +229,7 @@ void run_vs_bot(int use_anim, int anim_ms, int difficulty) {
 				}
 			}
 		}
-
+		super_bot_cleanup();
 		play_more = play_again_prompt();
 		if (!play_more) {
 			puts("Thanks for playing!");
