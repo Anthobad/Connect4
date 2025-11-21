@@ -7,101 +7,162 @@
 #include <limits.h>
 #include <time.h>
 
-#define TT_SIZE (1<<24)  // Increased to 16M entries (~400MB)
-#define MAX_DEPTH 20
+// -----------------------------------------------------------------------------
+// CONFIG
+// -----------------------------------------------------------------------------
 
-// --- Constants ---
-static const int column_order[7] = {3,4,2,5,1,6,0};
+// Transposition table size: 2^22 entries (~100MB) – you can raise to 1<<24 (~400MB) if you want
+#define TT_SIZE      (1 << 22)
 
-// --- Bit helpers ---
-static inline int can_play(const Board* b, int col) {
-    return game_can_drop(b, col) != -1;
-}
+// Depth for *interactive* hard bot (pick_best_move).
+// 14–18 is usually a good balance; raise if it's fast enough on your machine.
+#define MAX_DEPTH    20
 
-static inline uint64_t make_move_bit(const Board* b, int col) {
-    int landing = game_can_drop(b, col);
-    if (landing == -1) return 0ULL;
-    return 1ULL << (landing + col * 7);
-}
+// Depth for solve_position (offline solving / analysis).
+// This is a hard upper bound; the search will usually terminate earlier
+// when the game ends before depth runs out.
+#define SOLVE_DEPTH  42
 
-static inline void apply_move(Board* b, int col, char side) {
-    uint64_t mv = make_move_bit(b, col);
-    if (!mv) return; // Safety check
-    if (side == 'A') b->playerA ^= mv;
-    else             b->playerB ^= mv;
-    b->mask |= mv;
-}
+// -----------------------------------------------------------------------------
+// CONSTANTS & GLOBALS
+// -----------------------------------------------------------------------------
 
-static inline void undo_move(Board* b, int col) {
-    for (int r = ROWS-1; r >= 0; r--) {
-        int bit = col * 7 + r;
-        uint64_t m = (1ULL << bit);
-        if (b->mask & m) {
-            b->mask ^= m;
-            if (b->playerA & m)
-                b->playerA ^= m;
-            else // Must be playerB
-                b->playerB ^= m;
-            return;
-        }
-    }
-}
+static const int column_order[7] = {3, 4, 2, 5, 1, 6, 0};  // center-first ordering
 
-// Fast bitboard win check
-static inline int bitboard_win(uint64_t bb) {
-    uint64_t m;
-    // Horizontal
-    m = bb & (bb >> 7);
-    if (m & (m >> 14)) return 1;
-    // Diagonal forward slash
-    m = bb & (bb >> 6);
-    if (m & (m >> 12)) return 1;
-    // Diagonal backslash
-    m = bb & (bb >> 8);
-    if (m & (m >> 16)) return 1;
-    // Vertical
-    m = bb & (bb >> 1);
-    if (m & (m >> 2)) return 1;
-    return 0;
-}
+// Heights: next free row for each column, or -1 if column is full.
+// Used ONLY inside search; we re-init from Board before each search.
+static int heights[COLS];
 
-// --- Zobrist & TT ---
-static uint64_t zobrist[2][42];
-static uint64_t zobrist_side;
+// Fast "mate" scores
+static const int MATE = 10000000;
+
+// Node / TT stats (for debugging / info)
+static unsigned long long nodes_searched = 0;
+static unsigned long long tt_hits        = 0;
+
+// Zobrist hashing
+static uint64_t zobrist[2][42];   // [playerIndex][squareIndex]
+static uint64_t zobrist_side;     // side-to-move key
 
 typedef enum { EXACT, LOWERBOUND, UPPERBOUND } TTFlag;
 
 typedef struct {
-    uint64_t key;
-    int value;
-    int depth;
+    uint64_t      key;
+    int           value;
+    int           depth;
     unsigned char best_move;
     unsigned char flag;
 } TTEntry;
 
 static TTEntry* tt = NULL;
 
+// -----------------------------------------------------------------------------
+// BITBOARD & MOVE HELPERS
+// -----------------------------------------------------------------------------
+
+// Fast bitboard win check on 7x6 board with 7 bits per column
+static inline int bitboard_win(uint64_t bb) {
+    uint64_t m;
+
+    // Horizontal (shift by 7)
+    m = bb & (bb >> 7);
+    if (m & (m >> 14)) return 1;
+
+    // Diagonal "/" (shift by 6)
+    m = bb & (bb >> 6);
+    if (m & (m >> 12)) return 1;
+
+    // Diagonal "\" (shift by 8)
+    m = bb & (bb >> 8);
+    if (m & (m >> 16)) return 1;
+
+    // Vertical (shift by 1)
+    m = bb & (bb >> 1);
+    if (m & (m >> 2)) return 1;
+
+    return 0;
+}
+
+// Initialize heights[] from a Board using the normal game logic
+static void init_heights(const Board* b) {
+    for (int c = 0; c < COLS; c++) {
+        int r = game_can_drop(b, c);   // -1 if full, else landing row
+        heights[c] = r;
+    }
+}
+
+// Can we play in this column? (heights-based)
+static inline int can_play(const Board* b, int col) {
+    (void)b;                 // unused; we rely on heights[]
+    return (col >= 0 && col < COLS && heights[col] >= 0);
+}
+
+// Bit for the next move in column col (based on heights[]).
+static inline uint64_t move_bit_for_col(int col) {
+    int landing = heights[col];
+    if (landing < 0) return 0ULL;
+    return 1ULL << (landing + col * 7);
+}
+
+// Apply move for 'side' in column col, updating bitboards, mask, and heights
+static inline void apply_move(Board* b, int col, char side) {
+    uint64_t mv = move_bit_for_col(col);
+    if (!mv) return;  // safety: column full
+
+    if (side == 'A') b->playerA ^= mv;
+    else             b->playerB ^= mv;
+    b->mask |= mv;
+
+    // After placing a piece, the next free row is one above
+    heights[col]--;
+}
+
+// Undo last move in column col, using heights[] to know which bit to clear
+static inline void undo_move(Board* b, int col) {
+    // We always undo the last move placed in this column: increment height
+    heights[col]++;
+    int row = heights[col];
+    if (row < 0 || row >= ROWS) return;  // safety
+
+    uint64_t m = 1ULL << (row + col * 7);
+    b->mask ^= m;
+    if (b->playerA & m) b->playerA ^= m;
+    else if (b->playerB & m) b->playerB ^= m;
+}
+
+// -----------------------------------------------------------------------------
+// ZOBRIST & TT
+// -----------------------------------------------------------------------------
+
 void zobrist_init() {
     srand((unsigned)time(NULL));
-    for(int p = 0; p < 2; p++) {
-        for(int i = 0; i < 42; i++) {
-            // FIX: Proper 64-bit random generation
-            zobrist[p][i] = ((uint64_t)rand() << 32) | rand();
+    for (int p = 0; p < 2; p++) {
+        for (int i = 0; i < 42; i++) {
+            // 64-bit random
+            uint64_t hi = (uint64_t)(rand() & 0xFFFF);
+            uint64_t mid = (uint64_t)(rand() & 0xFFFF);
+            uint64_t lo = (uint64_t)(rand() & 0xFFFF);
+            zobrist[p][i] = (hi << 48) ^ (mid << 32) ^ lo;
         }
     }
-    zobrist_side = ((uint64_t)rand() << 32) | rand();
+    {
+        uint64_t hi = (uint64_t)(rand() & 0xFFFF);
+        uint64_t mid = (uint64_t)(rand() & 0xFFFF);
+        uint64_t lo = (uint64_t)(rand() & 0xFFFF);
+        zobrist_side = (hi << 48) ^ (mid << 32) ^ lo;
+    }
 }
 
 void tt_init() {
-    tt = calloc(TT_SIZE, sizeof(TTEntry));
+    tt = (TTEntry*)calloc(TT_SIZE, sizeof(TTEntry));
     if (!tt) {
         fprintf(stderr, "ERROR: Failed to allocate transposition table\n");
         exit(1);
     }
-    
-    // Try to load persistent TT
-    FILE* f = fopen("tt.bin","rb");
-    if(f) {
+
+    // Try to load persistent TT (optional)
+    FILE* f = fopen("tt.bin", "rb");
+    if (f) {
         size_t read = fread(tt, sizeof(TTEntry), TT_SIZE, f);
         printf("Loaded %zu TT entries from disk\n", read);
         fclose(f);
@@ -109,383 +170,419 @@ void tt_init() {
 }
 
 static void tt_save() {
-    if(!tt) return;
-    FILE* f = fopen("tt.bin","wb");
-    if(f) {
+    if (!tt) return;
+    FILE* f = fopen("tt.bin", "wb");
+    if (f) {
         fwrite(tt, sizeof(TTEntry), TT_SIZE, f);
         fclose(f);
         printf("Saved TT to disk\n");
     }
 }
 
-static void tt_store(uint64_t key, int value, int depth, TTFlag flag, int best_move) {
-    size_t idx = key & (TT_SIZE - 1);
-    TTEntry* e = &tt[idx];
-    // Always replace: higher depth or empty slot
-    if(e->key == 0 || e->depth <= depth) {
-        e->key = key;
-        e->value = value;
-        e->depth = depth;
+static inline void tt_store(uint64_t key, int value, int depth, TTFlag flag, int best_move) {
+    size_t idx   = key & (TT_SIZE - 1);
+    TTEntry* e   = &tt[idx];
+
+    if (e->key == 0 || e->depth <= depth) {
+        e->key       = key;
+        e->value     = value;
+        e->depth     = depth;
         e->best_move = (best_move < 0) ? 255 : (unsigned char)best_move;
-        e->flag = (unsigned char)flag;
+        e->flag      = (unsigned char)flag;
     }
 }
 
-static int tt_probe(uint64_t key, int depth, int alpha, int beta, int* out_value, int* out_move) {
+static inline int tt_probe(uint64_t key, int depth, int alpha, int beta,
+                           int* out_value, int* out_move) {
     size_t idx = key & (TT_SIZE - 1);
     TTEntry* e = &tt[idx];
-    
-    if(e->key == key) {
-        // Always extract best move hint
-        if(out_move && e->best_move != 255) {
-            *out_move = e->best_move;
-        }
-        
-        if(e->depth >= depth) {
-            if(e->flag == EXACT) {
-                *out_value = e->value;
-                return 1;
-            }
-            if(e->flag == LOWERBOUND && e->value > alpha) alpha = e->value;
-            if(e->flag == UPPERBOUND && e->value < beta) beta = e->value;
-            if(alpha >= beta) {
-                *out_value = e->value;
-                return 1;
-            }
-        }
+
+    if (e->key != key) return 0;
+
+    if (out_move && e->best_move != 255) {
+        *out_move = e->best_move;
     }
+
+    if (e->depth < depth) {
+        // Stored result is from a shallower search – still use move hint, but no bound
+        return 0;
+    }
+
+    int val = e->value;
+    if (e->flag == EXACT) {
+        *out_value = val;
+        return 1;
+    } else if (e->flag == LOWERBOUND) {
+        if (val > alpha) alpha = val;
+    } else if (e->flag == UPPERBOUND) {
+        if (val < beta) beta = val;
+    }
+    if (alpha >= beta) {
+        *out_value = val;
+        return 1;
+    }
+
     return 0;
 }
 
-// --- Mate-distance scoring ---
-static const int MATE = 10000000;
-
-static inline int encode_win(int ply) {
-    return MATE - ply;
-}
-
-static inline int encode_loss(int ply) {
-    return -MATE + ply;
-}
-
-// --- Compute Zobrist key ---
-static inline uint64_t compute_key(const Board* b, char side) {
+// Compute Zobrist key from scratch (used only at root)
+static uint64_t compute_key(const Board* b, char side) {
     uint64_t key = 0;
-    uint64_t bb = b->playerA;
-    while(bb) {
+    uint64_t bb;
+
+    bb = b->playerA;
+    while (bb) {
         int idx = __builtin_ctzll(bb);
         key ^= zobrist[0][idx];
         bb &= bb - 1;
     }
+
     bb = b->playerB;
-    while(bb) {
+    while (bb) {
         int idx = __builtin_ctzll(bb);
         key ^= zobrist[1][idx];
         bb &= bb - 1;
     }
-    if(side == 'B') key ^= zobrist_side;
+
+    if (side == 'B') key ^= zobrist_side;
     return key;
 }
 
-// --- Debug configuration ---
-#define DEBUG_ENABLED 1      // Set to 1 to enable detailed node printing
-#define DEBUG_MAX_DEPTH 10    // Only print nodes up to this depth (when DEBUG_ENABLED=1)
+// -----------------------------------------------------------------------------
+// SCORING HELPERS
+// -----------------------------------------------------------------------------
 
-// --- Node counter for stats ---
-static unsigned long long nodes_searched = 0;
-static unsigned long long tt_hits = 0;
+static inline int encode_win(int ply)  { return  MATE - ply; }
+static inline int encode_loss(int ply) { return -MATE + ply; }
 
-// --- Helper to interpret scores ---
+// Human-friendly text for scores (used in debug prints)
 static const char* score_to_string(int score, int ply) {
     static char buf[64];
-    if (score > MATE - 100) {
-        int moves_to_win = (MATE - score + ply) / 2;
-        snprintf(buf, sizeof(buf), "WIN in %d moves", moves_to_win);
-    } else if (score < -MATE + 100) {
-        int moves_to_loss = (MATE + score - ply) / 2;
-        snprintf(buf, sizeof(buf), "LOSS in %d moves", moves_to_loss);
+    if (score > MATE - 1000) {
+        int moves_to_win = (MATE - score + ply + 1) / 2;
+        snprintf(buf, sizeof(buf), "WIN in %d", moves_to_win);
+    } else if (score < -MATE + 1000) {
+        int moves_to_loss = (MATE + score - ply + 1) / 2;
+        snprintf(buf, sizeof(buf), "LOSS in %d", moves_to_loss);
     } else if (score == 0) {
         snprintf(buf, sizeof(buf), "DRAW");
     } else {
-        snprintf(buf, sizeof(buf), "Score: %+d", score);
+        snprintf(buf, sizeof(buf), "Score %+d", score);
     }
     return buf;
 }
 
-#if DEBUG_ENABLED
-// --- Helper to print indented debug info ---
-static void print_node_info(int ply, char side, int alpha, int beta, const char* msg) {
-    if (ply > DEBUG_MAX_DEPTH) return; // Only print up to max depth
-    for(int i = 0; i < ply; i++) printf("  ");
-    printf("[Ply %2d | %c | α=%+7d β=%+7d] %s\n", ply, side, alpha, beta, msg);
-}
-#else
-// No-op when debug is disabled
-static inline void print_node_info(int ply, char side, int alpha, int beta, const char* msg) {
-    (void)ply; (void)side; (void)alpha; (void)beta; (void)msg;
-}
-#endif
+// -----------------------------------------------------------------------------
+// SIMPLE POSITIONAL EVALUATION (for depth limit)
+// -----------------------------------------------------------------------------
 
-// --- Negamax solver with TT and optimizations ---
-static int negamax_solve(Board* b, int alpha, int beta, char side, int ply, int depth) {
-	//Base case
-	if(depth == 0) return -INT_MAX;
+// Evaluate a 4-cell window in direction (dr, dc) starting at (r,c)
+static int eval_window(const Board* b, int r, int c, int dr, int dc, char side) {
+    char opp = (side == 'A') ? 'B' : 'A';
+    int me = 0, them = 0, empty = 0;
 
+    for (int i = 0; i < 4; i++) {
+        char ch = getChar(b, r + i*dr, c + i*dc);
+        if (ch == side) me++;
+        else if (ch == opp) them++;
+        else empty++;
+    }
+
+    // Both colors present: blocked
+    if (me > 0 && them > 0) return 0;
+
+    int score = 0;
+
+    // Favor our threats
+    if (me == 4)                 score += 100000;
+    else if (me == 3 && empty==1) score += 100;
+    else if (me == 2 && empty==2) score += 10;
+    else if (me == 1 && empty==3) score += 1;
+
+    // Penalize opponent's almost-4
+    if (them == 3 && empty == 1) score -= 120;
+
+    return score;
+}
+
+// Basic heuristic evaluation from the POV of 'side'
+static int evaluate(const Board* b, char side) {
+    int score = 0;
+
+    // Center column preference (encourage occupying column 3)
+    for (int r = 0; r < ROWS; r++) {
+        char ch = getChar(b, r, 3);
+        if (ch == side) score += 3;
+        else if (ch != EMPTY) score -= 3;
+    }
+
+    // Horizontal windows
+    for (int r = 0; r < ROWS; r++) {
+        for (int c = 0; c <= COLS - 4; c++) {
+            score += eval_window(b, r, c, 0, 1, side);
+        }
+    }
+
+    // Vertical
+    for (int c = 0; c < COLS; c++) {
+        for (int r = 0; r <= ROWS - 4; r++) {
+            score += eval_window(b, r, c, 1, 0, side);
+        }
+    }
+
+    // Diagonal "\"
+    for (int r = 0; r <= ROWS - 4; r++) {
+        for (int c = 0; c <= COLS - 4; c++) {
+            score += eval_window(b, r, c, 1, 1, side);
+        }
+    }
+
+    // Diagonal "/"
+    for (int r = 3; r < ROWS; r++) {
+        for (int c = 0; c <= COLS - 4; c++) {
+            score += eval_window(b, r, c, -1, 1, side);
+        }
+    }
+
+    return score;
+}
+
+// -----------------------------------------------------------------------------
+// NEGAMAX + TT
+// -----------------------------------------------------------------------------
+
+static int negamax_solve(Board* b,
+                         int alpha, int beta,
+                         char side, int ply, int depth,
+                         uint64_t key)
+{
     nodes_searched++;
-    
-    // Generate key
-    uint64_t key = compute_key(b, side);
-    
-#if DEBUG_ENABLED
-    char entry_msg[128];
-    snprintf(entry_msg, sizeof(entry_msg), "Entering node (pieces: %d)", 
-             __builtin_popcountll(b->mask));
-    print_node_info(ply, side, alpha, beta, entry_msg);
-#endif
-    
-    // TT probe
-    int tt_val, tt_move = -1;
-    if(tt && tt_probe(key, MAX_DEPTH - ply, alpha, beta, &tt_val, &tt_move)) {
+
+    // Transposition table probe
+    int tt_val;
+    int tt_move = -1;
+    if (tt && tt_probe(key, depth, alpha, beta, &tt_val, &tt_move)) {
         tt_hits++;
-#if DEBUG_ENABLED
-        char tt_msg[128];
-        snprintf(tt_msg, sizeof(tt_msg), "TT HIT! Returning %+d (move hint: %d)", 
-                 tt_val, tt_move >= 0 ? tt_move + 1 : -1);
-        print_node_info(ply, side, alpha, beta, tt_msg);
-#endif
         return tt_val;
     }
-    
-    uint64_t me = (side == 'A') ? b->playerA : b->playerB;
-    uint64_t opp = (side == 'A') ? b->playerB : b->playerA;
-    
-    // Terminal checks using fast bitboard
-    if(bitboard_win(opp)) {
-        int score = encode_loss(ply);
-#if DEBUG_ENABLED
-        char msg[64];
-        snprintf(msg, sizeof(msg), "OPPONENT WON! Returning %+d", score);
-        print_node_info(ply, side, alpha, beta, msg);
-#endif
-        return score;
+
+    uint64_t meBB  = (side == 'A') ? b->playerA : b->playerB;
+    uint64_t oppBB = (side == 'A') ? b->playerB : b->playerA;
+
+    // Terminal checks (wins)
+    if (bitboard_win(meBB)) {
+        return encode_win(ply);
     }
-    
-    if((b->mask & 0x1FFFFFFFFFFFFFULL) == 0x1FFFFFFFFFFFFFULL) {
-#if DEBUG_ENABLED
-        print_node_info(ply, side, alpha, beta, "BOARD FULL - DRAW! Returning 0");
-#endif
+    if (bitboard_win(oppBB)) {
+        return encode_loss(ply);
+    }
+
+    // Depth limit: use evaluation
+    if (depth <= 0) {
+        return evaluate(b, side);
+    }
+
+    // Generate moves
+    int moves[COLS];
+    int n = 0;
+
+    // If TT suggested a move, try it first
+    if (tt_move >= 0 && can_play(b, tt_move)) {
+        moves[n++] = tt_move;
+    }
+
+    // Add other moves in preferred order
+    for (int i = 0; i < COLS; i++) {
+        int c = column_order[i];
+        if (c == tt_move) continue;
+        if (can_play(b, c)) moves[n++] = c;
+    }
+
+    if (n == 0) {
+        // No legal moves: draw
         return 0;
     }
-    
-    // Win-in-1 pruning: check if we can win immediately
-    for(int i = 0; i < 7; i++) {
-        int col = column_order[i];
-        if(!can_play(b, col)) continue;
-        
-        uint64_t move = make_move_bit(b, col);
-        if(bitboard_win(me | move)) {
+
+    // Win-in-1 pruning: check if side can win immediately
+    for (int i = 0; i < n; i++) {
+        int c = moves[i];
+        uint64_t mv = move_bit_for_col(c);
+        if (bitboard_win(meBB | mv)) {
             int score = encode_win(ply);
-#if DEBUG_ENABLED
-            char msg[64];
-            snprintf(msg, sizeof(msg), "IMMEDIATE WIN at col %d! Returning %+d", col + 1, score);
-            print_node_info(ply, side, alpha, beta, msg);
-#endif
-            if(tt) tt_store(key, score, MAX_DEPTH - ply, EXACT, col);
+            if (tt) tt_store(key, score, depth, EXACT, c);
             return score;
         }
     }
-    
-    // Generate moves in order
-    int moves[7];
-    int n = 0;
-    
-    // Try TT move first
-    if(tt_move >= 0 && can_play(b, tt_move)) {
-        moves[n++] = tt_move;
-    }
-    
-    // Add remaining moves
-    for(int i = 0; i < 7; i++) {
-        int col = column_order[i];
-        if(col == tt_move) continue;
-        if(can_play(b, col)) moves[n++] = col;
-    }
-    
-    if(n == 0) {
-#if DEBUG_ENABLED
-        print_node_info(ply, side, alpha, beta, "NO MOVES - DRAW! Returning 0");
-#endif
-        return 0;
-    }
-    
-#if DEBUG_ENABLED
-    char moves_msg[64];
-    snprintf(moves_msg, sizeof(moves_msg), "Trying %d moves", n);
-    print_node_info(ply, side, alpha, beta, moves_msg);
-#endif
-    
-    int best = -MATE;
+
+    int best      = -MATE;
     int best_move = moves[0];
-    int alpha_orig = alpha;
-    
+    int alphaOrig = alpha;
     char next_side = (side == 'A') ? 'B' : 'A';
-    
-    for(int i = 0; i < n; i++) {
-        int col = moves[i];
-        
-#if DEBUG_ENABLED
-        char move_msg[64];
-        snprintf(move_msg, sizeof(move_msg), "→ Trying move: Column %d", col + 1);
-        print_node_info(ply, side, alpha, beta, move_msg);
-#endif
-        
-        apply_move(b, col, side);
-        int val = -negamax_solve(b, -beta, -alpha, next_side, ply + 1, depth-1);
-        undo_move(b, col);
-        
-#if DEBUG_ENABLED
-        char result_msg[128];
-        snprintf(result_msg, sizeof(result_msg), "← Column %d returned %+d (best so far: %+d)", 
-                 col + 1, val, best);
-        print_node_info(ply, side, alpha, beta, result_msg);
-#endif
-        
-        if(val > best) {
-            best = val;
-            best_move = col;
-            
-#if DEBUG_ENABLED
-            char new_best_msg[64];
-            snprintf(new_best_msg, sizeof(new_best_msg), "★ NEW BEST: %+d", best);
-            print_node_info(ply, side, alpha, beta, new_best_msg);
-#endif
+
+    for (int i = 0; i < n; i++) {
+        int c = moves[i];
+
+        // Update key incrementally:
+        // piece index is (heights[c]) before apply_move
+        int row     = heights[c];
+        int idx     = row + c * 7;
+        int sideIdx = (side == 'A') ? 0 : 1;
+
+        uint64_t childKey = key;
+        childKey ^= zobrist[sideIdx][idx];  // add piece
+        childKey ^= zobrist_side;           // flip side to move
+
+        apply_move(b, c, side);
+        int val = -negamax_solve(b, -beta, -alpha,
+                                 next_side, ply + 1, depth - 1,
+                                 childKey);
+        undo_move(b, c);
+
+        if (val > best) {
+            best      = val;
+            best_move = c;
         }
-        
-        alpha = (alpha > best) ? alpha : best;
-        if(alpha >= beta) {
-#if DEBUG_ENABLED
-            char cutoff_msg[64];
-            snprintf(cutoff_msg, sizeof(cutoff_msg), "✂ BETA CUTOFF! (α=%+d ≥ β=%+d)", alpha, beta);
-            print_node_info(ply, side, alpha, beta, cutoff_msg);
-#endif
-            break;
-        }
+        if (best > alpha) alpha = best;
+        if (alpha >= beta) break;  // beta cutoff
     }
-    
-    // Store in TT
+
+    // Store to TT
     TTFlag flag;
-    if(best <= alpha_orig) flag = UPPERBOUND;
-    else if(best >= beta) flag = LOWERBOUND;
-    else flag = EXACT;
-    
-#if DEBUG_ENABLED
-    char exit_msg[128];
-    snprintf(exit_msg, sizeof(exit_msg), "Exiting with score %+d (best move: col %d, flag: %s)", 
-             best, best_move + 1, 
-             flag == EXACT ? "EXACT" : flag == LOWERBOUND ? "LOWER" : "UPPER");
-    print_node_info(ply, side, alpha, beta, exit_msg);
-#endif
-    
-    if(tt) tt_store(key, best, MAX_DEPTH - ply, flag, best_move);
-    
+    if      (best <= alphaOrig) flag = UPPERBOUND;
+    else if (best >= beta)      flag = LOWERBOUND;
+    else                        flag = EXACT;
+
+    if (tt) tt_store(key, best, depth, flag, best_move);
+
     return best;
 }
 
+// -----------------------------------------------------------------------------
+// SOLVER INTERFACE
+// -----------------------------------------------------------------------------
+
 int solve_position(Board* b) {
-    int res = negamax_solve(b, -MATE, MATE, b->current, 0, MAX_DEPTH);
-    if(res > 0) return 1;
-    if(res < 0) return -1;
+    init_heights(b);
+    char side = b->current;
+    uint64_t key = compute_key(b, side);
+
+    nodes_searched = 0;
+    tt_hits        = 0;
+
+    int res = negamax_solve(b, -MATE, MATE, side, 0, SOLVE_DEPTH, key);
+
+    printf("Solve stats: nodes=%llu, tt_hits=%llu (%.1f%%)\n",
+           nodes_searched, tt_hits,
+           nodes_searched ? (100.0 * tt_hits / nodes_searched) : 0.0);
+
+    if (res > 0) return 1;
+    if (res < 0) return -1;
     return 0;
 }
 
 const char* solve_str(Board* b) {
-    int res = solve_position(b);
-    if(res > 0) return "WIN for side to move";
-    if(res < 0) return "LOSS for side to move";
+    int r = solve_position(b);
+    if (r > 0) return "WIN for side to move";
+    if (r < 0) return "LOSS for side to move";
     return "DRAW";
 }
 
-// --- Opening book ---
+// -----------------------------------------------------------------------------
+// OPENING BOOK
+// -----------------------------------------------------------------------------
+
 static const int opening_book[][2] = {
     {0,3}, {1,2}, {2,3}, {3,2}, {4,3}, {5,2}, {6,3}, {7,2}
 };
-static int opening_book_size = 8;
+static const int opening_book_size = 8;
 
 int opening_book_move(Board* b, int ply) {
-    if(ply >= opening_book_size) return -1;
+    (void)b;
+    if (ply < 0 || ply >= opening_book_size) return -1;
     return opening_book[ply][1];
 }
 
-// --- Wrapper: automatic best move ---
-int pick_best_move(Board* b) {
-    int ply = __builtin_popcountll(b->mask);
+// -----------------------------------------------------------------------------
+// MAIN HARD BOT: pick_best_move
+// -----------------------------------------------------------------------------
 
-    printf("\n╔════════════════════════════════════════════╗\n");
-    printf("║        BOT ANALYSIS (Player %c)            ║\n", b->current);
-    printf("╚════════════════════════════════════════════╝\n");
-    printf("Position: Move %d/42\n", ply + 1);
+int pick_best_move(Board* b) {
+    int ply  = __builtin_popcountll(b->mask);
+    char side = b->current;
+
+    // Init heights from current board
+    init_heights(b);
+
+    printf("\n[HARD BOT] Player %c, move %d/42\n", side, ply + 1);
     printf("Legal moves:");
-    for (int i = 0; i < COLS; ++i)
-        if (can_play(b, i)) printf(" %d", i+1);
+    for (int c = 0; c < COLS; c++) {
+        if (can_play(b, c)) printf(" %d", c + 1);
+    }
     printf("\n");
 
-    // Opening book
+    // Opening book: if move is playable, just use it
     int book = opening_book_move(b, ply);
     if (book != -1 && can_play(b, book)) {
-        printf("\n✓ Using opening book move: Column %d\n", book + 1);
-        printf("════════════════════════════════════════════\n\n");
+        printf("Using opening book move: column %d\n\n", book + 1);
         return book;
     }
 
-    int best = -1;
-    int best_val = -MATE;
-    char side = b->current;
-
+    // No book: run search
     int moves[COLS];
     int n = 0;
-    for (int i = 0; i < COLS; i++)
-        if (can_play(b, i)) moves[n++] = i;
-
+    for (int c = 0; c < COLS; c++) {
+        if (can_play(b, c)) moves[n++] = c;
+    }
     if (n == 0) return -1;
 
-    printf("\nSearching to depth %d...\n", MAX_DEPTH - ply);
-    printf("════════════════════════════════════════════\n");
+    uint64_t key = compute_key(b, side);
 
-    // Reset stats
     nodes_searched = 0;
-    tt_hits = 0;
+    tt_hits        = 0;
+
+    int best     = -1;
+    int best_val = -MATE;
+
+    printf("Searching to depth %d...\n", MAX_DEPTH);
 
     for (int i = 0; i < n; i++) {
-        int col = moves[i];
-        
-        printf("Analyzing Column %d... ", col + 1);
-        fflush(stdout);
-        
-        apply_move(b, col, side);
-        int val = -negamax_solve(b, -MATE, MATE, (side == 'A') ? 'B' : 'A', ply + 1, MAX_DEPTH);
-        undo_move(b, col);
+        int c = moves[i];
 
-        printf("%s", score_to_string(val, ply));
-        
+        // Build child key
+        int row     = heights[c];
+        int idx     = row + c * 7;
+        int sideIdx = (side == 'A') ? 0 : 1;
+
+        uint64_t childKey = key;
+        childKey ^= zobrist[sideIdx][idx];
+        childKey ^= zobrist_side;
+
+        apply_move(b, c, side);
+        int val = -negamax_solve(b, -MATE, MATE,
+                                 (side == 'A') ? 'B' : 'A',
+                                 ply + 1, MAX_DEPTH - 1,
+                                 childKey);
+        undo_move(b, c);
+
+        printf("  Column %d: %s\n", c + 1, score_to_string(val, ply));
+
         if (val > best_val) {
-            printf(" ← BEST!");
             best_val = val;
-            best = col;
+            best     = c;
         }
-        printf("\n");
     }
 
-    printf("════════════════════════════════════════════\n");
-    printf("SEARCH STATS:\n");
-    printf("  Nodes searched: %llu\n", nodes_searched);
-    printf("  TT hits: %llu (%.1f%%)\n", tt_hits, 
-           nodes_searched > 0 ? (100.0 * tt_hits / nodes_searched) : 0.0);
-    printf("════════════════════════════════════════════\n");
-    printf("✓ DECISION: Column %d - %s\n", best + 1, score_to_string(best_val, ply));
-    printf("════════════════════════════════════════════\n\n");
-    
+    printf("Search stats: nodes=%llu, tt_hits=%llu (%.1f%%)\n",
+           nodes_searched, tt_hits,
+           nodes_searched ? (100.0 * tt_hits / nodes_searched) : 0.0);
+    printf("Chosen move: column %d (%s)\n\n", best + 1, score_to_string(best_val, ply));
+
     return best;
 }
+
+// -----------------------------------------------------------------------------
+// SHUTDOWN & SIMPLE BOTS
+// -----------------------------------------------------------------------------
 
 void shutdown_bot() {
     tt_save();
@@ -493,7 +590,7 @@ void shutdown_bot() {
     tt = NULL;
 }
 
-// Simple fallback bots
+// Random bot (easy)
 int bot_choose_move(const Board* g) {
     int valid[COLS];
     int n = 0;
@@ -506,24 +603,25 @@ int bot_choose_move(const Board* g) {
     return valid[rand() % n];
 }
 
+// Medium bot: blocks immediate wins + random
 int bot_choose_move_medium(const Board* g) {
-    int blocking_cols[COLS];
-    int num_blocking = 0;
+    int blocking[COLS];
+    int nb = 0;
     char human = 'A';
 
     for (int c = 0; c < COLS; c++) {
         int r = game_can_drop(g, c);
         if (r == -1) continue;
-        
-        Board temp = *g;
-        setChar(&temp, r, c, human);
-        if (checkWin(&temp, human)) {
-            blocking_cols[num_blocking++] = c;
+
+        Board tmp = *g;
+        setChar(&tmp, r, c, human);
+        if (checkWin(&tmp, human)) {
+            blocking[nb++] = c;
         }
     }
 
-    if (num_blocking > 0) {
-        return blocking_cols[rand() % num_blocking];
+    if (nb > 0) {
+        return blocking[rand() % nb];
     }
 
     return bot_choose_move(g);
