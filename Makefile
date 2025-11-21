@@ -1,7 +1,7 @@
 # Simple Makefile for Connect4
 
 CC := gcc
-CFLAGS := -std=c11 -Wall -Werror -g
+CFLAGS := -O3 -march=native -Wall -Wextra -g
 
 SRCS := play.c gamelogic.c ui.c bot.c history.c input.c controller.c
 OBJS := play.o gamelogic.o ui.o bot.o history.o input.o controller.o

@@ -167,7 +167,8 @@ void run_vs_bot(int use_anim, int anim_ms, int difficulty) {
 			exit(0);
 		}
 	}
-
+	zobrist_init();
+	tt_init();
 	int play_more = 1;
 	while (play_more) {
 		Board G;
@@ -175,8 +176,6 @@ void run_vs_bot(int use_anim, int anim_ms, int difficulty) {
 		history_reset();
 		ui_print_board(&G, 1);
 		//char bot_side = (turn[0] == 'A') ? 'B' : 'A';
-		zobrist_init();
-		tt_init();
 		int game_over = 0;
 		while (!game_over) {
 			if (G.current == 'A') {
