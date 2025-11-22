@@ -31,7 +31,7 @@ int history_undo(Board* G, int steps) {
 			return i > 0;
 		current_index--;
 		Move m = history[current_index];
-		G->cells[m.row][m.col] = EMPTY;
+		setChar(G, m.row, m.col, EMPTY);
 		G->current = m.player;
 	}
 	return 1;
@@ -46,7 +46,7 @@ int history_redo(Board* G, int steps) {
 		if (current_index == move_count)
 			return i > 0;
 		m = history[current_index];
-		G->cells[m.row][m.col] = m.player;
+		setChar(G, m.row, m.col, m.player);
 		current_index++;
 	}
 

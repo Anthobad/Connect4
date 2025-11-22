@@ -50,6 +50,8 @@ If the board fills up without a winner, the game ends in a draw.
   * About Game
   * Quit
 * Modular design: separated into logical subsystems for clarity and scalability
+* LAN / Online friend-vs-friend mode over TCP (one player hosts a simple server on a port, the other joins using IP + port)
+* In-game quick chat / trash talk presets (e.g., “Nice move!”, “GG!”, etc.) available in human vs human and online modes via a small quick-chat menu
 * Future-ready for multithreading or LAN play
 
 ---
@@ -73,8 +75,7 @@ cd Connect4
 ### Build manually (example with GCC)
 
 ```bash
-gcc -std=c11 -Wall -Werror -o connect4 \
-	play.c gamelogic.c ui.c bot.c history.c input.c controller.c
+gcc -std=c11 -Wall -Werror -o connect4 	play.c gamelogic.c ui.c bot.c history.c input.c controller.c
 ```
 
 Or use the provided Makefile:
@@ -116,6 +117,7 @@ Run the executable:
 * `1`–`7` → Drop a piece into that column
 * `u` → Undo last move
 * `r` → Redo an undone move
+* `t` → Open the quick chat / trash talk menu (in human vs human and online modes) and send a preset message to the opponent
 * `q` → Quit immediately
 
 After each finished game, you’re prompted to play again (`y`/`n`).
@@ -133,27 +135,36 @@ Top-level source files:
 * `bot.c` / `bot.h` — easy and medium bot implementations.
 * `history.c` / `history.h` — undo/redo stack.
 * `input.c` / `input.h` — parses player input (columns, undo/redo, quit).
+* `net.c` / `net.h` — minimal TCP networking helpers (open a listening server socket, accept a single client, or connect to a given IP:port) used for the LAN friend-vs-friend mode.
 
 ---
 
 ## Module overview
 
 ### gamelogic.h
-
 ```c
 #define ROWS 6
 #define COLS 7
 #define EMPTY '.'
 
+/* Bitboard representation used by the current implementation.
+ * Each column uses 7 bits (one unused/top sentinel), so the board fits in
+ * 7 * 7 = 49 bits within a 64-bit integer. Bit index = r + c*7 where
+ * r is row (0 = top, ROWS-1 = bottom), and c is column (0..6).
+ */
 typedef struct {
-	char cells[ROWS][COLS];
-	char current;
+  uint64_t playerA; /* bits set where player A has pieces */
+  uint64_t playerB; /* bits set where player B has pieces */
+  uint64_t mask;    /* bits set where any piece exists */
+  char current;     /* 'A' or 'B' — who's turn it is */
 } Board;
 
+void setChar(Board* g, int r, int c, char player);
+char getChar(const Board* g, int r, int c);
 void initializeBoard(Board* g, char turn);
-int game_can_drop(const Board* g, int col);
-int game_drop(Board* g, int col, char player);
-int checkWin(const Board* g, int r, int c, char player);
+int game_can_drop(const Board* g, int col); /* returns landing row or -1 */
+int game_drop(Board* g, int col, char player); /* returns landing row or -1 */
+int checkWin(const Board* g, char player);
 int checkDraw(const Board* g);
 ```
 
@@ -164,7 +175,8 @@ int checkDraw(const Board* g);
 ```c
 void ui_clear_screen(void);
 void ui_print_board(const Board* g, int use_color);
-int ui_drop_with_animation(Board* g, int col, char player, int delay_ms);
+/* ui_drop_with_animation now takes an options struct pointer for colors/delay */
+int ui_drop_with_animation(Board* g, int col, char player, const UiOptions* opt);
 int ui_main_menu(void);
 int ui_bot_menu(void);
 ```
@@ -184,10 +196,10 @@ int bot_choose_move(const Board* g);
 int bot_choose_move_medium(const Board* g);
 ```
 
-**Easy bot**
+**Easy bot**  
 Chooses a random valid column.
 
-**Medium bot (new)**
+**Medium bot (new)**  
 Checks if the player can win next turn and blocks it,
 and avoids playing into an immediate loss.
 
@@ -198,8 +210,11 @@ and avoids playing into an immediate loss.
 ```c
 void history_reset(void);
 void history_record_move(int row, int col, char player);
-int history_undo(Board* G);
-int history_redo(Board* G);
+/* undo/redo accept a steps parameter so modes (like bot vs human) can
+ * undo/redo multiple moves at once (e.g. undo both player and bot move).
+ */
+int history_undo(Board* G, int steps);
+int history_redo(Board* G, int steps);
 ```
 
 Implements an **undo/redo system** that tracks every move.
@@ -261,6 +276,7 @@ gcc -std=c11 -Wall -Wextra -o connect4.exe play.c gamelogic.c ui.c bot.c history
 1. Run `./connect4`
 2. Select `1` → Play directly
 3. Players alternate moves or use `u` / `r` for undo/redo
+4. Players can also press `t` on their turn to open the quick chat menu and send a preset trash talk message
 
 ### Human vs Bot
 
@@ -271,6 +287,14 @@ gcc -std=c11 -Wall -Wextra -o connect4.exe play.c gamelogic.c ui.c bot.c history
    * `1` Easy
    * `2` Medium
 4. Player `A` goes first; bot plays as `B`
+
+### Online vs Friend (LAN)
+
+1. Run `./connect4` on **both** machines (same local network / LAN).
+2. From the main menu, enter the online / network mode.
+3. On one machine, choose to **host**: this starts a simple TCP server on a chosen port (e.g., `4444`).
+4. On the other machine, choose to **join** and enter the host’s IP address and port.
+5. Once connected, play as usual. Undo/redo works across the network, and both players can use `t` during their turns to send quick chat / trash talk messages.
 
 ---
 
@@ -284,9 +308,8 @@ gcc -std=c11 -Wall -Wextra -o connect4.exe play.c gamelogic.c ui.c bot.c history
 
 ## Credits and license
 
-Developed by 
-**Anthony Badawi (AnthoBad)**
-**Moustafa Hoteit (IamTufa)**
-AUB – CMPS 241 Systems Programming course Project
-Fall 2025/26
-
+Developed by  
+**Anthony Badawi (AnthoBad)**  
+**Moustafa Hoteit (IamTufa)**  
+AUB – CMPS 241 Systems Programming course Project  
+Fall 2025/2026

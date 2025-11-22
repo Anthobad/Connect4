@@ -1,10 +1,10 @@
 # Simple Makefile for Connect4
 
 CC := gcc
-CFLAGS := -std=c11 -Wall -Werror -g
+CFLAGS := -O3 -march=native -Wall -Wextra
 
-SRCS := play.c gamelogic.c ui.c bot.c history.c input.c controller.c
-OBJS := play.o gamelogic.o ui.o bot.o history.o input.o controller.o
+SRCS := play.c gamelogic.c ui.c bot.c history.c input.c controller.c net.c
+OBJS := play.o gamelogic.o ui.o bot.o history.o input.o controller.o net.o
 
 all: connect4
 
@@ -28,6 +28,16 @@ ui.o: ui.c ui.h gamelogic.h
 
 bot.o: bot.c bot.h gamelogic.h
 	$(CC) $(CFLAGS) -c bot.c -o bot.o
+
+history.o: history.c history.h gamelogic.h
+	$(CC) $(CFLAGS) -c history.c -o history.o
+
+input.o: input.c input.h
+	$(CC) $(CFLAGS) -c input.c -o input.o
+
+controller.o: controller.c controller.h gamelogic.h ui.h bot.h history.h input.h
+	$(CC) $(CFLAGS) -c controller.c -o controller.o
+
 
 clean:
 	rm -f $(OBJS) connect4
