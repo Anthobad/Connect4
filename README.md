@@ -50,6 +50,8 @@ If the board fills up without a winner, the game ends in a draw.
   * About Game
   * Quit
 * Modular design: separated into logical subsystems for clarity and scalability
+* LAN / Online friend-vs-friend mode over TCP (one player hosts a simple server on a port, the other joins using IP + port)
+* In-game quick chat / trash talk presets (e.g., “Nice move!”, “GG!”, etc.) available in human vs human and online modes via a small quick-chat menu
 * Future-ready for multithreading or LAN play
 
 ---
@@ -73,8 +75,7 @@ cd Connect4
 ### Build manually (example with GCC)
 
 ```bash
-gcc -std=c11 -Wall -Werror -o connect4 \
-	play.c gamelogic.c ui.c bot.c history.c input.c controller.c
+gcc -std=c11 -Wall -Werror -o connect4 	play.c gamelogic.c ui.c bot.c history.c input.c controller.c
 ```
 
 Or use the provided Makefile:
@@ -116,6 +117,7 @@ Run the executable:
 * `1`–`7` → Drop a piece into that column
 * `u` → Undo last move
 * `r` → Redo an undone move
+* `t` → Open the quick chat / trash talk menu (in human vs human and online modes) and send a preset message to the opponent
 * `q` → Quit immediately
 
 After each finished game, you’re prompted to play again (`y`/`n`).
@@ -133,6 +135,7 @@ Top-level source files:
 * `bot.c` / `bot.h` — easy and medium bot implementations.
 * `history.c` / `history.h` — undo/redo stack.
 * `input.c` / `input.h` — parses player input (columns, undo/redo, quit).
+* `net.c` / `net.h` — minimal TCP networking helpers (open a listening server socket, accept a single client, or connect to a given IP:port) used for the LAN friend-vs-friend mode.
 
 ---
 
@@ -193,10 +196,10 @@ int bot_choose_move(const Board* g);
 int bot_choose_move_medium(const Board* g);
 ```
 
-**Easy bot**
+**Easy bot**  
 Chooses a random valid column.
 
-**Medium bot (new)**
+**Medium bot (new)**  
 Checks if the player can win next turn and blocks it,
 and avoids playing into an immediate loss.
 
@@ -273,6 +276,7 @@ gcc -std=c11 -Wall -Wextra -o connect4.exe play.c gamelogic.c ui.c bot.c history
 1. Run `./connect4`
 2. Select `1` → Play directly
 3. Players alternate moves or use `u` / `r` for undo/redo
+4. Players can also press `t` on their turn to open the quick chat menu and send a preset trash talk message
 
 ### Human vs Bot
 
@@ -283,6 +287,14 @@ gcc -std=c11 -Wall -Wextra -o connect4.exe play.c gamelogic.c ui.c bot.c history
    * `1` Easy
    * `2` Medium
 4. Player `A` goes first; bot plays as `B`
+
+### Online vs Friend (LAN)
+
+1. Run `./connect4` on **both** machines (same local network / LAN).
+2. From the main menu, enter the online / network mode.
+3. On one machine, choose to **host**: this starts a simple TCP server on a chosen port (e.g., `4444`).
+4. On the other machine, choose to **join** and enter the host’s IP address and port.
+5. Once connected, play as usual. Undo/redo works across the network, and both players can use `t` during their turns to send quick chat / trash talk messages.
 
 ---
 

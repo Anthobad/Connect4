@@ -3,8 +3,8 @@
 CC := gcc
 CFLAGS := -O3 -march=native -Wall -Wextra -fopenmp
 
-SRCS := play.c gamelogic.c ui.c bot.c history.c input.c controller.c
-OBJS := play.o gamelogic.o ui.o bot.o history.o input.o controller.o
+SRCS := play.c gamelogic.c ui.c bot.c history.c input.c controller.c net.c
+OBJS := play.o gamelogic.o ui.o bot.o history.o input.o controller.o net.o
 
 all: connect4
 
