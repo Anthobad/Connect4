@@ -308,8 +308,9 @@ gcc -std=c11 -Wall -Wextra -o connect4.exe play.c gamelogic.c ui.c bot.c history
 
 ## Credits and license
 
-Developed by  
-**Anthony Badawi (AnthoBad)**  
-**Moustafa Hoteit (IamTufa)**  
-AUB – CMPS 241 Systems Programming course Project  
+Developed by 
+**Anthony Badawi (AnthoBad)**
+**Moustafa Hoteit (IamTufa)**
+AUB – CMPS 241 Systems Programming course Project
 Fall 2025/2026
+

@@ -1,7 +1,7 @@
 # Simple Makefile for Connect4
 
 CC := gcc
-CFLAGS := -O3 -march=native -Wall -Wextra
+CFLAGS := -O3 -march=native -Wall -Wextra -fopenmp
 
 SRCS := play.c gamelogic.c ui.c bot.c history.c input.c controller.c net.c
 OBJS := play.o gamelogic.o ui.o bot.o history.o input.o controller.o net.o
@@ -15,7 +15,7 @@ run-no-anim: connect4
 	./connect4 --no-anim
 
 connect4: $(OBJS)
-	$(CC) -o $@ $^
+	$(CC) -fopenmp -o $@ $^
 
 play.o: play.c gamelogic.h ui.h bot.h
 	$(CC) $(CFLAGS) -c play.c -o play.o
