@@ -492,9 +492,9 @@ const char* solve_str(Board* b) {
 // -----------------------------------------------------------------------------
 
 static const int opening_book[][2] = {
-    {0,3}, {1,2}, {2,3}, {3,2}, {4,3}, {5,2}, {6,3}, {7,2}
+    {0,3}, {1,3}, {2,3}, {3,3}, {4,3}, {5,3}
 };
-static const int opening_book_size = 8;
+static const int opening_book_size = 6;
 
 int opening_book_move(Board* b, int ply) {
     (void)b;
