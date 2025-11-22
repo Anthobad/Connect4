@@ -15,13 +15,16 @@
 #define TT_SIZE      (1 << 22)
 
 // Depth for *interactive* hard bot (pick_best_move).
-// 14–18 is usually a good balance; raise if it's fast enough on your machine.
+// 14–20 is usually a good balance; raise if it's fast enough on your machine.
 #define MAX_DEPTH    20
 
 // Depth for solve_position (offline solving / analysis).
 // This is a hard upper bound; the search will usually terminate earlier
 // when the game ends before depth runs out.
 #define SOLVE_DEPTH  42
+
+// Verbose logging: set to 1 if you want detailed console output, 0 for speed
+#define BOT_VERBOSE  1
 
 // -----------------------------------------------------------------------------
 // CONSTANTS & GLOBALS
@@ -139,16 +142,16 @@ void zobrist_init() {
     for (int p = 0; p < 2; p++) {
         for (int i = 0; i < 42; i++) {
             // 64-bit random
-            uint64_t hi = (uint64_t)(rand() & 0xFFFF);
+            uint64_t hi  = (uint64_t)(rand() & 0xFFFF);
             uint64_t mid = (uint64_t)(rand() & 0xFFFF);
-            uint64_t lo = (uint64_t)(rand() & 0xFFFF);
+            uint64_t lo  = (uint64_t)(rand() & 0xFFFF);
             zobrist[p][i] = (hi << 48) ^ (mid << 32) ^ lo;
         }
     }
     {
-        uint64_t hi = (uint64_t)(rand() & 0xFFFF);
+        uint64_t hi  = (uint64_t)(rand() & 0xFFFF);
         uint64_t mid = (uint64_t)(rand() & 0xFFFF);
-        uint64_t lo = (uint64_t)(rand() & 0xFFFF);
+        uint64_t lo  = (uint64_t)(rand() & 0xFFFF);
         zobrist_side = (hi << 48) ^ (mid << 32) ^ lo;
     }
 }
@@ -164,7 +167,9 @@ void tt_init() {
     FILE* f = fopen("tt.bin", "rb");
     if (f) {
         size_t read = fread(tt, sizeof(TTEntry), TT_SIZE, f);
+#if BOT_VERBOSE
         printf("Loaded %zu TT entries from disk\n", read);
+#endif
         fclose(f);
     }
 }
@@ -175,7 +180,9 @@ static void tt_save() {
     if (f) {
         fwrite(tt, sizeof(TTEntry), TT_SIZE, f);
         fclose(f);
+#if BOT_VERBOSE
         printf("Saved TT to disk\n");
+#endif
     }
 }
 
@@ -294,7 +301,7 @@ static int eval_window(const Board* b, int r, int c, int dr, int dc, char side) 
     int score = 0;
 
     // Favor our threats
-    if (me == 4)                 score += 100000;
+    if (me == 4)                  score += 100000;
     else if (me == 3 && empty==1) score += 100;
     else if (me == 2 && empty==2) score += 10;
     else if (me == 1 && empty==3) score += 1;
@@ -471,9 +478,11 @@ int solve_position(Board* b) {
 
     int res = negamax_solve(b, -MATE, MATE, side, 0, SOLVE_DEPTH, key);
 
+#if BOT_VERBOSE
     printf("Solve stats: nodes=%llu, tt_hits=%llu (%.1f%%)\n",
            nodes_searched, tt_hits,
            nodes_searched ? (100.0 * tt_hits / nodes_searched) : 0.0);
+#endif
 
     if (res > 0) return 1;
     if (res < 0) return -1;
@@ -507,23 +516,27 @@ int opening_book_move(Board* b, int ply) {
 // -----------------------------------------------------------------------------
 
 int pick_best_move(Board* b) {
-    int ply  = __builtin_popcountll(b->mask);
+    int  ply  = __builtin_popcountll(b->mask);
     char side = b->current;
 
     // Init heights from current board
     init_heights(b);
 
+#if BOT_VERBOSE
     printf("\n[HARD BOT] Player %c, move %d/42\n", side, ply + 1);
     printf("Legal moves:");
     for (int c = 0; c < COLS; c++) {
         if (can_play(b, c)) printf(" %d", c + 1);
     }
     printf("\n");
+#endif
 
     // Opening book: if move is playable, just use it
     int book = opening_book_move(b, ply);
     if (book != -1 && can_play(b, book)) {
+#if BOT_VERBOSE
         printf("Using opening book move: column %d\n\n", book + 1);
+#endif
         return book;
     }
 
@@ -543,7 +556,9 @@ int pick_best_move(Board* b) {
     int best     = -1;
     int best_val = -MATE;
 
+#if BOT_VERBOSE
     printf("Searching to depth %d...\n", MAX_DEPTH);
+#endif
 
     for (int i = 0; i < n; i++) {
         int c = moves[i];
@@ -564,7 +579,9 @@ int pick_best_move(Board* b) {
                                  childKey);
         undo_move(b, c);
 
+#if BOT_VERBOSE
         printf("  Column %d: %s\n", c + 1, score_to_string(val, ply));
+#endif
 
         if (val > best_val) {
             best_val = val;
@@ -572,10 +589,12 @@ int pick_best_move(Board* b) {
         }
     }
 
+#if BOT_VERBOSE
     printf("Search stats: nodes=%llu, tt_hits=%llu (%.1f%%)\n",
            nodes_searched, tt_hits,
            nodes_searched ? (100.0 * tt_hits / nodes_searched) : 0.0);
     printf("Chosen move: column %d (%s)\n\n", best + 1, score_to_string(best_val, ply));
+#endif
 
     return best;
 }
