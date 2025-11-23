@@ -16,4 +16,7 @@ void history_record_move(int row, int col, char player);
 int history_undo(Board* G, int steps);
 int history_redo(Board* G, int steps);
 
+// NEW: get last played move (returns 1 on success, 0 if none)
+int history_get_last_move(Move* out);
+
 #endif

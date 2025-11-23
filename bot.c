@@ -1,5 +1,6 @@
 #include "gamelogic.h"
 #include "bot.h"
+#include "history.h"
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -517,11 +518,74 @@ static const int opening_book[][2] = {
 static const int opening_book_size = 6;
 
 int opening_book_move(Board* b, int ply) {
-    (void)b;
-    if (ply < 0 || ply >= opening_book_size) return -1;
-    return opening_book[ply][1];
-}
+	// Normal book for early plies: always play center (col 3, 0-based)
+	if (ply >= 0 && ply < opening_book_size) {
+		int col = opening_book[ply][1];
+		if (game_can_drop(b, col) != -1)
+			return col;
+		// If center somehow not playable, fall through to search / other book
+	}
 
+	// Special book at ply 6: after human's 3rd move, bot to move
+	// Move order (bot starts as 'B'):
+	//   0: B, 1: A, 2: B, 3: A, 4: B, 5: A  → now ply == 6, current == 'B'
+	if (ply == 6 && b->current == 'B') {
+		Move last;
+		if (!history_get_last_move(&last))
+			return -1;          // no history? fall back to search
+
+		if (last.player != 'A')
+			return -1;          // last move must be human's
+
+		int human_col = last.col;  // 0..6
+
+		int options[2];
+		int num_opts = 0;
+
+		switch (human_col) {
+		case 0: // human played col 1
+			options[0] = 2; options[1] = 4; num_opts = 2; break; // bot: 3 or 5
+		case 1: // human played col 2
+			options[0] = 1; num_opts = 1; break;                 // bot: 2
+		case 2: // human played col 3
+			options[0] = 2; options[1] = 5; num_opts = 2; break; // bot: 3 or 6
+		case 3: // human played col 4
+			options[0] = 2; options[1] = 4; num_opts = 2; break; // bot: 3 or 5
+		case 4: // human played col 5
+			options[0] = 4; options[1] = 1; num_opts = 2; break; // bot: 5 or 2
+		case 5: // human played col 6
+			options[0] = 5; num_opts = 1; break;                 // bot: 6
+		case 6: // human played col 7
+			options[0] = 4; options[1] = 2; num_opts = 2; break; // bot: 5 or 3
+		default:
+			return -1;
+		}
+
+		if (num_opts == 0) return -1;
+
+		// Randomly choose among the options that are actually playable
+		if (num_opts == 1) {
+			int c = options[0];
+			if (game_can_drop(b, c) != -1)
+				return c;
+			return -1;
+		} else {
+			int i  = rand() % 2;
+			int c1 = options[i];
+			int c2 = options[1 - i];
+
+			if (game_can_drop(b, c1) != -1)
+				return c1;
+			if (game_can_drop(b, c2) != -1)
+				return c2;
+
+			return -1;
+		}
+	}
+
+	// No book for other plies
+	return -1;
+}
 // -----------------------------------------------------------------------------
 // MAIN HARD BOT: pick_best_move (root-parallel with OpenMP)
 // -----------------------------------------------------------------------------

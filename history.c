@@ -57,3 +57,16 @@ int history_redo(Board* G, int steps) {
 
 	return 1;
 }
+
+int history_get_last_move(Move* out) {
+	if (!out) return 0;
+
+	// current_index points to "next" move to be played/redone,
+	// so the last actual move is at current_index - 1.
+	if (current_index <= 0) {
+		return 0; // no moves yet
+	}
+
+	*out = history[current_index - 1];
+	return 1;
+}
