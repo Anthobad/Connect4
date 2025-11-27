@@ -74,11 +74,7 @@ cd Connect4
 
 ### Build manually (example with GCC)
 
-```bash
-gcc -std=c11 -Wall -Werror -o connect4 	play.c gamelogic.c ui.c bot.c history.c input.c controller.c
-```
-
-Or use the provided Makefile:
+Use the provided Makefile:
 
 ```bash
 make
@@ -95,6 +91,11 @@ Run the executable:
 ./connect4 --no-anim   # disable falling animation
 ```
 
+Or if you prefer to run and compile with the provided makefile:
+```bash
+make run           # with animations and colors
+make run-no-anim       # disable falling animation
+```
 ---
 
 ## Controls
@@ -102,14 +103,16 @@ Run the executable:
 ### Main Menu
 
 * `1` → Play Human vs Human (1v1)
-* `2` → Play vs Bot
-* `3` → About Game
+* `2` → Play Human vs Friend
+* `3` → Play Human vs Bot
+* `4` → About Game
 * `q` → Quit
 
 ### Bot Difficulty Menu
 
 * `1` → Easy Bot
 * `2` → Medium Bot
+* `3` → Hard Bot
 * `b` → Back to Main Menu
 
 ### During Gameplay
@@ -253,22 +256,6 @@ Contains `main()` — the overall program entry point that initializes settings 
 
 ---
 
-## Build notes
-
-* Always include **all .c files** in the build:
-
-```bash
-gcc -Wall -Werror -o connect4 play.c gamelogic.c ui.c bot.c history.c input.c controller.c
-```
-
-* On Windows (MinGW):
-
-```bash
-gcc -std=c11 -Wall -Wextra -o connect4.exe play.c gamelogic.c ui.c bot.c history.c input.c controller.c
-```
-
----
-
 ## Runtime examples
 
 ### Human vs Human
@@ -295,14 +282,6 @@ gcc -std=c11 -Wall -Wextra -o connect4.exe play.c gamelogic.c ui.c bot.c history
 3. On one machine, choose to **host**: this starts a simple TCP server on a chosen port (e.g., `4444`).
 4. On the other machine, choose to **join** and enter the host’s IP address and port.
 5. Once connected, play as usual. Undo/redo works across the network, and both players can use `t` during their turns to send quick chat / trash talk messages.
-
----
-
-## Extending the project
-
-* Add a **Hard bot** (minimax, alpha-beta pruning, or scoring heuristics)
-* Implement **multithreading** for bot calculations and animations
-* Add **LAN/Online mode** (structure already supports expansion)
 
 ---
 
