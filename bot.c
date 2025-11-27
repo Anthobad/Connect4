@@ -21,7 +21,7 @@
 
 // Depth for *interactive* hard bot (pick_best_move).
 // 14–20 is usually a good balance; raise if it's fast enough on your machine.
-#define MAX_DEPTH    20
+#define MAX_DEPTH    14
 
 // Depth for solve_position (offline solving / analysis).
 // This is a hard upper bound; the search will usually terminate earlier
@@ -32,7 +32,7 @@
 #define BOT_VERBOSE  0
 
 // Max threads (only used if OpenMP is enabled)
-#define BOT_MAX_THREADS 4
+#define BOT_MAX_THREADS 6
 
 // -----------------------------------------------------------------------------
 // CONSTANTS & GLOBALS
@@ -515,7 +515,7 @@ const char* solve_str(Board* b) {
 static const int opening_book[][2] = {
     {0,3}, {1,3}, {2,3}, {3,3}, {4,3}, {5,3}
 };
-static const int opening_book_size = 6;
+static const int opening_book_size = 1; //was 6
 
 int opening_book_move(Board* b, int ply) {
 	// Normal book for early plies: always play center (col 3, 0-based)
@@ -525,6 +525,20 @@ int opening_book_move(Board* b, int ply) {
 			return col;
 		// If center somehow not playable, fall through to search / other book
 	}
+	else if (ply < 6){
+		Move last;
+		if (!history_get_last_move(&last))
+			return -1;          // no history? fall back to search
+
+		if (last.player != 'A')
+			return -1;          // last move must be human's
+
+		int human_col = last.col;  // 0..6
+
+		if (human_col == 3)
+			return 3;
+	}
+	return -1; //remove
 
 	// Special book at ply 6: after human's 3rd move, bot to move
 	// Move order (bot starts as 'B'):
