@@ -40,6 +40,10 @@
 
 static const int column_order[7] = {3, 4, 2, 5, 1, 6, 0};  // center-first ordering
 
+// Number of red stones and yellow stones in the center column
+static int red_stones = 0;
+static int yellow_stones = 0;
+
 // Fast "mate" scores
 static const int MATE = 10000000;
 
@@ -521,8 +525,10 @@ int opening_book_move(Board* b, int ply) {
 	// Normal book for early plies: always play center (col 3, 0-based)
 	if (ply >= 0 && ply < opening_book_size) {
 		int col = opening_book[ply][1];
-		if (game_can_drop(b, col) != -1)
+		if (game_can_drop(b, col) != -1){
+			red_stones++;
 			return col;
+		}
 		// If center somehow not playable, fall through to search / other book
 	}
 	else if (ply < 6){
@@ -535,15 +541,16 @@ int opening_book_move(Board* b, int ply) {
 
 		int human_col = last.col;  // 0..6
 
-		if (human_col == 3)
+		if (human_col == 3){
+			yellow_stones++;
 			return 3;
+		}
 	}
-	return -1; //remove
 
 	// Special book at ply 6: after human's 3rd move, bot to move
 	// Move order (bot starts as 'B'):
 	//   0: B, 1: A, 2: B, 3: A, 4: B, 5: A  → now ply == 6, current == 'B'
-	if (ply == 6 && b->current == 'B') {
+	if (ply == 6 && b->current == 'B' && yellow_stones == 2 && red_stones == 1) {
 		Move last;
 		if (!history_get_last_move(&last))
 			return -1;          // no history? fall back to search
