@@ -10,7 +10,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-
+#include <string.h>
+#include <arpa/inet.h>
 
 static const char *quick_chat_msgs[] = {
 	"Nice move!",
@@ -508,6 +509,32 @@ static void run_network_game_loop(int sockfd, int is_server, int use_anim, int a
 	}
 }
 
+// Check the ip address of the host
+char* getIp() {
+     char *ip = malloc(INET_ADDRSTRLEN);
+     if (!ip) return NULL;
+
+     int sock = socket(AF_INET, SOCK_DGRAM, 0);
+     if (sock < 0) return NULL;
+
+     struct sockaddr_in serv;
+     memset(&serv, 0, sizeof(serv));
+     serv.sin_family = AF_INET;
+     serv.sin_addr.s_addr = inet_addr("8.8.8.8");
+     serv.sin_port = htons(80);
+
+     connect(sock, (const struct sockaddr*)&serv, sizeof(serv));
+
+     struct sockaddr_in name;
+     socklen_t namelen = sizeof(name);
+     getsockname(sock, (struct sockaddr*)&name, &namelen);
+
+     inet_ntop(AF_INET, &name.sin_addr, ip, INET_ADDRSTRLEN);
+
+     close(sock);
+     return ip;
+}
+
 void run_human_online(int use_anim, int anim_ms) {
 	char line[128];
 	int is_server = 0;
@@ -544,7 +571,7 @@ void run_human_online(int use_anim, int anim_ms) {
 				port = p;
 		}
 
-		printf("Hosting game on port %d. Waiting for a friend to connect...\n", port);
+		printf("Hosting game on ip: %s and port:  %d. Waiting for a friend to connect...\n",getIp(), port);
 		sockfd = net_open_server(port);
 		if (sockfd < 0) {
 			puts("Failed to open server socket.");
